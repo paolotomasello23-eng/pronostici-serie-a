@@ -1,0 +1,18 @@
+@import "tailwindcss";
+
+/* Mobile-first: niente zoom involontario sugli input, tocchi comodi. */
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  @apply bg-slate-50 text-slate-900 antialiased;
+}
+
+/* Gli input numerici su iOS zoomano se il font è sotto i 16px. */
+input,
+select,
+textarea,
+button {
+  font-size: max(16px, 1rem);
+}

@@ -1,0 +1,47 @@
+#!/bin/sh
+# Rete di sicurezza per un repository pubblico: blocca il commit se sembra
+# che stia per finire online un segreto.
+#
+# Attivato con:  git config core.hooksPath .githooks
+# Da saltare solo con cognizione di causa:  git commit --no-verify
+
+staged=$(git diff --cached --name-only --diff-filter=ACM)
+[ -z "$staged" ] && exit 0
+
+fail=0
+
+# 1. File di ambiente committati per sbaglio.
+for file in $staged; do
+  case "$file" in
+    .env|.env.local|.env.*.local|*/.env|*/.env.local)
+      echo "BLOCCATO: stai committando $file, che contiene segreti."
+      fail=1
+      ;;
+  esac
+done
+
+# 2. Contenuti che somigliano a chiavi. `.example` è esente: lì i valori
+#    sono vuoti per definizione.
+for file in $staged; do
+  case "$file" in
+    *.example|.githooks/*) continue ;;
+  esac
+  [ -f "$file" ] || continue
+
+  if grep -nE 'eyJ[A-Za-z0-9_-]{20,}' "$file" >/dev/null 2>&1; then
+    echo "BLOCCATO: $file contiene quello che sembra un JWT."
+    fail=1
+  fi
+  if grep -niE '(service_role|SUPABASE_JWT_SECRET|FOOTBALL_DATA_API_KEY|CRON_SECRET)[[:space:]]*[:=][[:space:]]*["'\'']?[A-Za-z0-9_-]{12,}' "$file" >/dev/null 2>&1; then
+    echo "BLOCCATO: $file sembra contenere una chiave scritta a mano nel codice."
+    fail=1
+  fi
+done
+
+if [ "$fail" -ne 0 ]; then
+  echo ""
+  echo "Sposta il valore in .env.local (che è in .gitignore) e riprova."
+  exit 1
+fi
+
+exit 0
