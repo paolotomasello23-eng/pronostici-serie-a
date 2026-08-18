@@ -100,4 +100,11 @@ pausa-campionato serve un ping settimanale, previsto in M7.
 | M4 | Inserimento pronostici + lock server-side | ✅ |
 | M5 | Sync risultati + scoring su DB + ricalcolo forzato | ✅ |
 | M6 | Classifica generale + dettaglio giornata | ✅ |
-| M7 | Scheduler + deploy + polish mobile | — |
+| M7 | Scheduler + deploy + polish mobile | ✅ |
+
+Istruzioni per la messa online: [`deploy.md`](deploy.md).
+
+Il lock non si riapre da solo, ma l'admin può riallinearlo a mano dal
+pannello: se scatta per sbaglio — un orario sbagliato, una prova finita
+male — senza quella via d'uscita la giornata resterebbe murata per sempre.
+Resta una decisione esplicita di una persona, tracciata nell'audit log.

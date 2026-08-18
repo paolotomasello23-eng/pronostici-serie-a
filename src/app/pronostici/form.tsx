@@ -225,7 +225,8 @@ export function PronosticiForm({ matchdayId }: { matchdayId: string }) {
             })}
           </ul>
 
-          <div className="fixed inset-x-0 bottom-0 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur">
+          {/* Sopra la barra di navigazione, che occupa gli ultimi 80px. */}
+          <div className="fixed inset-x-0 bottom-20 z-10 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur">
             <div className="mx-auto flex max-w-md items-center justify-between">
               <span className="text-sm text-slate-600">
                 {compiled} di {data.matches.length} compilati

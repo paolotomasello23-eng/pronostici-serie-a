@@ -124,6 +124,81 @@ export async function POST(request: Request) {
 }
 
 /**
+ * Reimposta il lock di una giornata sul calcio d'inizio reale.
+ *
+ * Il lock, una volta scattato, non si ricalcola più da solo: è la regola
+ * che impedisce di riaprire i pronostici a partite iniziate. Ma se è
+ * scattato per sbaglio — un orario sbagliato inserito a mano, una prova
+ * finita male — l'admin deve poter rimettere le cose a posto, altrimenti
+ * quella giornata resta murata per sempre.
+ *
+ * È una decisione deliberata di una persona, non un automatismo, e resta
+ * scritta nell'audit log.
+ */
+export async function PATCH(request: Request) {
+  const auth = await requireAdmin();
+  if (!auth.ok) {
+    return NextResponse.json({ error: "Non autorizzato." }, { status: auth.status });
+  }
+
+  const parsed = syncSchema.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Parametri non validi." }, { status: 400 });
+  }
+
+  const { season, number } = parsed.data;
+  const admin = serviceClient();
+
+  const { data: matchday } = await admin
+    .from("matchdays")
+    .select("id, lock_at")
+    .eq("season", season)
+    .eq("number", number)
+    .maybeSingle();
+
+  if (!matchday) {
+    return NextResponse.json({ error: "Giornata non trovata." }, { status: 404 });
+  }
+
+  const { data: matches } = await admin
+    .from("matches")
+    .select("kickoff_at, status")
+    .eq("matchday_id", matchday.id);
+
+  const kickoffs = (matches ?? [])
+    .filter((m) => !["POSTPONED", "CANCELLED"].includes(m.status as string))
+    .map((m) => m.kickoff_at as string)
+    .sort();
+
+  const lockAt = kickoffs[0] ?? null;
+
+  if (!lockAt) {
+    return NextResponse.json(
+      { error: "Nessuna partita in calendario: non c'è un orario da cui ripartire." },
+      { status: 409 },
+    );
+  }
+
+  const stillLocked = new Date(lockAt).getTime() <= Date.now();
+
+  await admin
+    .from("matchdays")
+    .update({ lock_at: lockAt, status: stillLocked ? "locked" : "open" })
+    .eq("id", matchday.id);
+
+  await admin.from("audit_log").insert({
+    actor_id: auth.session.playerId,
+    action: "matchday.reset_lock",
+    entity: "matchday",
+    entity_id: matchday.id,
+    before: { lock_at: matchday.lock_at },
+    after: { lock_at: lockAt },
+  });
+
+  return NextResponse.json({ ok: true, lockAt, stillLocked });
+}
+
+/**
  * Elimina una partita di troppo (un doppione, o una inserita per errore).
  *
  * Si rifiuta di farlo se qualcuno l'ha già pronosticata: cancellarla

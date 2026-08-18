@@ -5,6 +5,7 @@ risultato esatto, il server blocca tutto al fischio d'inizio della prima
 partita e a fine giornata aggiorna la classifica.
 
 Regole, scelte tecniche e milestone: [`docs/decisioni.md`](docs/decisioni.md).
+Come metterla online: [`docs/deploy.md`](docs/deploy.md).
 
 ## Come si parte
 

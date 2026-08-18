@@ -112,6 +112,40 @@ export default function AdminPage() {
     }
   }
 
+  /** Riporta il lock all'orario reale della prima partita. */
+  async function resetLock() {
+    const ok = window.confirm(
+      "Riallineare il lock al calcio d'inizio della prima partita?\n\n" +
+        "I pronostici di questa giornata tornano modificabili da tutti, e chi " +
+        "li ha già visti resta avvantaggiato. Fallo solo se la giornata si è " +
+        "bloccata per errore.",
+    );
+    if (!ok) return;
+
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const r = await fetch("/api/admin/matchday", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ season, number }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error ?? "Errore");
+      setMessage(
+        d.stillLocked
+          ? "Lock riallineato, ma la prima partita è già iniziata: la giornata resta bloccata."
+          : `Lock riportato al ${formatRome(d.lockAt)}. I pronostici sono di nuovo aperti.`,
+      );
+      await load();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   /** Scarica i risultati finali dall'API e rifà i conti. */
   async function syncResults() {
     await runScoring("POST", "Risultati scaricati");
@@ -318,10 +352,23 @@ export default function AdminPage() {
             </span>
           </div>
           {locked && (
-            <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-amber-900">
-              Giornata bloccata: i pronostici non sono più modificabili e il lock
-              non verrà ricalcolato, nemmeno se cambiano gli orari.
-            </p>
+            <div className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-amber-900">
+              <p>
+                Giornata bloccata: i pronostici non sono più modificabili e il
+                lock non verrà ricalcolato, nemmeno se cambiano gli orari.
+              </p>
+              <button
+                onClick={resetLock}
+                disabled={busy}
+                className="mt-2 rounded-lg border border-amber-700 px-3 py-2 text-sm font-semibold disabled:opacity-50"
+              >
+                Riallinea il lock al calcio d&apos;inizio
+              </button>
+              <p className="mt-1 text-xs">
+                Da usare solo se si è bloccata per sbaglio: riapre i pronostici
+                a tutti.
+              </p>
+            </div>
           )}
         </section>
       )}
@@ -424,7 +471,7 @@ export default function AdminPage() {
       <button
         onClick={save}
         disabled={busy || matches.length === 0}
-        className="sticky bottom-4 rounded-xl bg-slate-900 px-5 py-4 text-lg font-semibold text-white shadow-lg disabled:opacity-50"
+        className="sticky bottom-24 z-10 rounded-xl bg-slate-900 px-5 py-4 text-lg font-semibold text-white shadow-lg disabled:opacity-50"
       >
         {busy ? "Un attimo…" : "Salva le partite"}
       </button>

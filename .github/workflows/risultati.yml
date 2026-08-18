@@ -1,0 +1,28 @@
+name: Sincronizza risultati
+
+# Ogni 15 minuti nelle ore in cui si gioca, così la classifica si aggiorna
+# poco dopo il fischio finale. Sui repository pubblici le Actions non
+# consumano minuti, quindi questa cadenza è gratuita.
+#
+# Tutti gli orari sono UTC (l'Italia è avanti di 1 o 2 ore).
+on:
+  schedule:
+    # Venerdì, sabato, domenica e lunedì: dal pomeriggio a notte fonda,
+    # quando si giocano le partite di giornata.
+    - cron: "*/15 16-23 * * 5,6,0,1"
+    # Martedì e mercoledì sera: i turni infrasettimanali e i recuperi.
+    - cron: "*/30 18-22 * * 2,3"
+    # Una passata al mattino per raccogliere ciò che si fosse perso.
+    - cron: "0 7 * * *"
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Scarica risultati e ricalcola i punteggi
+        run: |
+          curl --fail-with-body --silent --show-error \
+            --max-time 300 \
+            -X POST "${{ secrets.APP_URL }}/api/cron/results" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"

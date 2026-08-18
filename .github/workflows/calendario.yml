@@ -1,0 +1,25 @@
+name: Sincronizza calendario
+
+# Gli orari di Serie A cambiano fino a pochi giorni prima, e con loro il
+# momento in cui la giornata si blocca. Due giri al giorno bastano: nessuno
+# sposta una partita di venerdì al martedì pomeriggio senza preavviso.
+#
+# Gli orari sono in UTC: 06:00 e 18:00 UTC = 08:00 e 20:00 in Italia
+# (07:00 e 19:00 in inverno).
+on:
+  schedule:
+    - cron: "0 6,18 * * *"
+  # Permette di lanciarlo a mano dalla scheda Actions, utile per provarlo
+  # senza aspettare il prossimo orario.
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Aggiorna partite e orari
+        run: |
+          curl --fail-with-body --silent --show-error \
+            --max-time 120 \
+            -X POST "${{ secrets.APP_URL }}/api/cron/matches" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"

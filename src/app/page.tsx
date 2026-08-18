@@ -176,13 +176,6 @@ export default async function Home() {
         </section>
       )}
 
-      <a
-        href="/classifica"
-        className="block rounded-xl border border-slate-300 bg-white px-5 py-4 text-center text-lg font-semibold active:bg-slate-100"
-      >
-        Classifica
-      </a>
-
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <p className="text-sm font-medium text-slate-500">Codice d&apos;invito</p>
         <p className="mt-1 text-3xl font-bold tracking-[0.3em]">
