@@ -201,12 +201,13 @@ export default async function Home() {
       </section>
 
       <div className="flex items-center justify-between pt-2">
-        {session.isAdmin ? (
+        <a href="/regole" className="text-sm font-medium text-slate-700 underline">
+          Come si gioca
+        </a>
+        {session.isAdmin && (
           <a href="/admin" className="text-sm font-medium text-slate-700 underline">
             Pannello admin
           </a>
-        ) : (
-          <span />
         )}
         <LogoutButton />
       </div>
