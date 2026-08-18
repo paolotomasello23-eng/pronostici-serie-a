@@ -56,6 +56,14 @@ export function PushToggle() {
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
+    // Se le chiavi non sono ancora configurate il riquadro non compare:
+    // meglio assente che presente e rotto. Appare da solo appena la chiave
+    // pubblica arriva tra le variabili d'ambiente.
+    if (!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) {
+      setState("unsupported");
+      return;
+    }
+
     if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
       // Su iPhone il supporto compare solo dopo l'installazione: distinguere
       // i due casi evita di dire "non supportato" a chi invece può averle.

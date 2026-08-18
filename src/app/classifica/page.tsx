@@ -138,12 +138,6 @@ export default async function ClassificaPage({
               >
                 Vedi chi ha pronosticato cosa
               </a>
-              <a
-                href="/statistiche"
-                className="mt-2 block text-sm text-slate-600 underline"
-              >
-                Statistiche di lega
-              </a>
             </section>
           )}
         </>

@@ -242,13 +242,6 @@ export default async function Home() {
         </ul>
       </section>
 
-      <a
-        href="/statistiche"
-        className="block rounded-xl border border-slate-300 bg-white px-5 py-4 text-center font-semibold active:bg-slate-100"
-      >
-        Statistiche di lega
-      </a>
-
       <PushToggle />
 
       <div className="flex items-center justify-between pt-2">
