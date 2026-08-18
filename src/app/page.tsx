@@ -4,6 +4,7 @@ import { userClient } from "@/lib/supabase/server";
 import { LogoutButton } from "./logout-button";
 import { TeamCrest } from "@/components/team-crest";
 import { Countdown } from "@/components/countdown";
+import { PushToggle } from "@/components/push-toggle";
 
 function formatRome(iso: string): string {
   return new Date(iso).toLocaleString("it-IT", {
@@ -247,6 +248,8 @@ export default async function Home() {
       >
         Statistiche di lega
       </a>
+
+      <PushToggle />
 
       <div className="flex items-center justify-between pt-2">
         <a href="/regole" className="text-sm font-medium text-slate-700 underline">
