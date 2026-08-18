@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { TeamCrest } from "@/components/team-crest";
+import { Countdown } from "@/components/countdown";
 
 interface Match {
   id: string;
@@ -169,6 +170,14 @@ export function PronosticiForm({ matchdayId }: { matchdayId: string }) {
           </p>
         )}
       </header>
+
+      {data.matchday.lock_at && !data.isLocked && (
+        <Countdown
+          lockAt={data.matchday.lock_at}
+          compiled={compiled}
+          total={data.matches.length}
+        />
+      )}
 
       {error && (
         <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p>

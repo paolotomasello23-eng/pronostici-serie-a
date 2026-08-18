@@ -3,6 +3,7 @@ import { getSessionWithToken } from "@/lib/auth/session";
 import { userClient } from "@/lib/supabase/server";
 import { LogoutButton } from "./logout-button";
 import { TeamCrest } from "@/components/team-crest";
+import { Countdown } from "@/components/countdown";
 
 function formatRome(iso: string): string {
   return new Date(iso).toLocaleString("it-IT", {
@@ -93,6 +94,19 @@ export default async function Home() {
   const isLocked =
     !!matchday?.lock_at && new Date(matchday.lock_at).getTime() <= Date.now();
 
+  // Quanti ne ho già compilati io: prima del lock RLS restituisce solo i miei.
+  const { count: myPredictions } =
+    matchday && !isLocked && (matches ?? []).length > 0
+      ? await supabase
+          .from("predictions")
+          .select("id", { count: "exact", head: true })
+          .eq("player_id", session.playerId)
+          .in(
+            "match_id",
+            (matches ?? []).map((m) => m.id as string),
+          )
+      : { count: null };
+
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-6 p-4 pb-10">
       <header className="pt-4">
@@ -115,10 +129,22 @@ export default async function Home() {
             </span>
           </div>
 
-          {matchday.lock_at && (
+          {matchday.lock_at && !isLocked && (
+            <div className="mb-3">
+              <Countdown
+                lockAt={matchday.lock_at as string}
+                compiled={myPredictions ?? undefined}
+                total={(matches ?? []).length || undefined}
+              />
+              <p className="mt-1 text-sm text-slate-500">
+                Si blocca il {formatRome(matchday.lock_at)}
+              </p>
+            </div>
+          )}
+
+          {matchday.lock_at && isLocked && (
             <p className="mb-3 text-sm text-slate-500">
-              {isLocked ? "Bloccata dal" : "Si blocca il"}{" "}
-              {formatRome(matchday.lock_at)}
+              Bloccata dal {formatRome(matchday.lock_at)}
             </p>
           )}
 
@@ -214,6 +240,13 @@ export default async function Home() {
           ))}
         </ul>
       </section>
+
+      <a
+        href="/statistiche"
+        className="block rounded-xl border border-slate-300 bg-white px-5 py-4 text-center font-semibold active:bg-slate-100"
+      >
+        Statistiche di lega
+      </a>
 
       <div className="flex items-center justify-between pt-2">
         <a href="/regole" className="text-sm font-medium text-slate-700 underline">
