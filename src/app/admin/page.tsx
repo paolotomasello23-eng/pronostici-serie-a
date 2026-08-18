@@ -112,6 +112,41 @@ export default function AdminPage() {
     }
   }
 
+  /** Scarica i risultati finali dall'API e rifà i conti. */
+  async function syncResults() {
+    await runScoring("POST", "Risultati scaricati");
+  }
+
+  /** Rifà i conti sui dati già presenti, dopo una correzione manuale. */
+  async function recompute() {
+    await runScoring("PUT", "Punteggi ricalcolati");
+  }
+
+  async function runScoring(method: "POST" | "PUT", label: string) {
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const r = await fetch("/api/admin/results", {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ season, number }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error ?? "Errore");
+      setMessage(
+        `${label}: ${d.finishedMatches} partite finite su ${d.totalMatches}, ` +
+          `${d.scoredRows} punteggi scritti.` +
+          (d.complete ? " Giornata completa." : " Giornata ancora aperta: mancano dei risultati."),
+      );
+      await load();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function save() {
     setBusy(true);
     setError(null);
@@ -238,7 +273,31 @@ export default function AdminPage() {
           disabled={busy || season === null}
           className="rounded-xl bg-slate-900 px-4 py-3 font-semibold text-white disabled:opacity-50"
         >
-          Scarica da football-data
+          Scarica calendario
+        </button>
+      </section>
+
+      <section className="flex flex-wrap gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+        <div className="w-full">
+          <h2 className="font-semibold">Risultati e punteggi</h2>
+          <p className="text-sm text-slate-500">
+            Il bonus &quot;unico&quot; dipende dai pronostici di tutti, quindi
+            ogni ricalcolo rifà i conti dell&apos;intera giornata.
+          </p>
+        </div>
+        <button
+          onClick={syncResults}
+          disabled={busy || season === null}
+          className="rounded-xl bg-slate-900 px-4 py-3 font-semibold text-white disabled:opacity-50"
+        >
+          Scarica risultati e ricalcola
+        </button>
+        <button
+          onClick={recompute}
+          disabled={busy || season === null}
+          className="rounded-xl border border-slate-300 px-4 py-3 font-semibold disabled:opacity-50"
+        >
+          Ricalcola e basta
         </button>
       </section>
 
