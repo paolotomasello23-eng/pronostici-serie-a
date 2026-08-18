@@ -30,6 +30,9 @@ export interface MatchInput {
   homeTeamShort: string;
   awayTeam: string;
   awayTeamShort: string;
+  /** Indirizzo dello stemma, assente per le partite inserite a mano. */
+  homeTeamCrest?: string | null;
+  awayTeamCrest?: string | null;
   /** ISO 8601 in UTC. */
   kickoffAt: string;
   status: MatchStatus;

@@ -91,13 +91,15 @@ export async function applyMatchday(
     const status =
       input.status === "FINISHED" && homeGoals === null ? "IN_PLAY" : input.status;
 
-    const row = {
+    const row: Record<string, unknown> = {
       matchday_id: matchdayId,
       external_id: input.externalId,
       home_team: input.homeTeam,
       home_team_short: input.homeTeamShort,
       away_team: input.awayTeam,
       away_team_short: input.awayTeamShort,
+      home_team_crest: input.homeTeamCrest ?? null,
+      away_team_crest: input.awayTeamCrest ?? null,
       kickoff_at: input.kickoffAt,
       status,
       home_goals: homeGoals,
@@ -111,6 +113,12 @@ export async function applyMatchday(
       input.id ?? (input.externalId ? byExternalId.get(input.externalId) : undefined);
 
     if (targetId) {
+      // Una correzione manuale non porta con sé gli stemmi: se li scrivessimo
+      // comunque, un ritocco all'orario cancellerebbe i loghi già scaricati
+      // dall'API. Quando mancano, si lascia stare quello che c'è.
+      if (!input.homeTeamCrest) delete row.home_team_crest;
+      if (!input.awayTeamCrest) delete row.away_team_crest;
+
       const { error } = await admin.from("matches").update(row).eq("id", targetId);
       if (error) throw new Error(`Aggiornamento partita fallito: ${error.message}`);
       updated++;

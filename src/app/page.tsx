@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getSessionWithToken } from "@/lib/auth/session";
 import { userClient } from "@/lib/supabase/server";
 import { LogoutButton } from "./logout-button";
+import { TeamCrest } from "@/components/team-crest";
 
 function formatRome(iso: string): string {
   return new Date(iso).toLocaleString("it-IT", {
@@ -83,7 +84,7 @@ export default async function Home() {
     ? await supabase
         .from("matches")
         .select(
-          "id, home_team_short, away_team_short, home_team, away_team, kickoff_at, status, home_goals, away_goals",
+          "id, home_team_short, away_team_short, home_team, away_team, home_team_crest, away_team_crest, kickoff_at, status, home_goals, away_goals",
         )
         .eq("matchday_id", matchday.id)
         .order("kickoff_at")
@@ -135,10 +136,24 @@ export default async function Home() {
                 className="rounded-xl border border-slate-200 bg-white px-4 py-3"
               >
                 <div className="flex items-center justify-between gap-3">
-                  <span className="font-medium">
-                    {(m.home_team_short as string) ?? m.home_team}
-                    <span className="mx-1.5 text-slate-400">–</span>
-                    {(m.away_team_short as string) ?? m.away_team}
+                  <span className="flex min-w-0 items-center gap-1.5 font-medium">
+                    <TeamCrest
+                      src={m.home_team_crest as string | null}
+                      name={(m.home_team_short as string) ?? (m.home_team as string)}
+                      size={22}
+                    />
+                    <span className="truncate">
+                      {(m.home_team_short as string) ?? m.home_team}
+                    </span>
+                    <span className="text-slate-400">–</span>
+                    <TeamCrest
+                      src={m.away_team_crest as string | null}
+                      name={(m.away_team_short as string) ?? (m.away_team as string)}
+                      size={22}
+                    />
+                    <span className="truncate">
+                      {(m.away_team_short as string) ?? m.away_team}
+                    </span>
                   </span>
                   {m.status === "FINISHED" ? (
                     <span className="shrink-0 font-semibold tabular-nums">

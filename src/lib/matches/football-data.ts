@@ -28,6 +28,7 @@ export class FootballDataError extends Error {
 interface ApiTeam {
   name?: string;
   shortName?: string;
+  crest?: string;
 }
 
 interface ApiMatch {
@@ -111,6 +112,8 @@ export async function fetchMatchdayFromApi(
       homeTeamShort: m.homeTeam.shortName ?? m.homeTeam.name ?? "Casa",
       awayTeam: m.awayTeam.name ?? "Squadra trasferta",
       awayTeamShort: m.awayTeam.shortName ?? m.awayTeam.name ?? "Trasferta",
+      homeTeamCrest: m.homeTeam.crest ?? null,
+      awayTeamCrest: m.awayTeam.crest ?? null,
       kickoffAt: m.utcDate,
       status: toStatus(m.status),
       homeGoals: fullTime?.home ?? null,

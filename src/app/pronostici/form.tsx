@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { TeamCrest } from "@/components/team-crest";
 
 interface Match {
   id: string;
@@ -8,6 +9,8 @@ interface Match {
   away_team_short: string | null;
   home_team: string;
   away_team: string;
+  home_team_crest: string | null;
+  away_team_crest: string | null;
   kickoff_at: string;
   status: string;
   home_goals: number | null;
@@ -198,8 +201,15 @@ export function PronosticiForm({ matchdayId }: { matchdayId: string }) {
                     )}
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="min-w-0 flex-1 truncate text-right font-medium">
-                      {teamName(m, "home")}
+                    <span className="flex min-w-0 flex-1 items-center justify-end gap-1.5">
+                      <span className="truncate font-medium">
+                        {teamName(m, "home")}
+                      </span>
+                      <TeamCrest
+                        src={m.home_team_crest}
+                        name={teamName(m, "home")}
+                        size={20}
+                      />
                     </span>
                     <input
                       inputMode="numeric"
@@ -216,8 +226,15 @@ export function PronosticiForm({ matchdayId }: { matchdayId: string }) {
                       className="w-12 shrink-0 rounded-lg border border-slate-300 py-3 text-center text-lg font-semibold"
                       aria-label={`Gol ${teamName(m, "away")}`}
                     />
-                    <span className="min-w-0 flex-1 truncate font-medium">
-                      {teamName(m, "away")}
+                    <span className="flex min-w-0 flex-1 items-center gap-1.5">
+                      <TeamCrest
+                        src={m.away_team_crest}
+                        name={teamName(m, "away")}
+                        size={20}
+                      />
+                      <span className="truncate font-medium">
+                        {teamName(m, "away")}
+                      </span>
                     </span>
                   </div>
                 </li>
@@ -256,11 +273,21 @@ function LockedView({ data }: { data: Payload }) {
           const rows = data.predictions.filter((p) => p.match_id === m.id);
           return (
             <li key={m.id} className="rounded-2xl border border-slate-200 bg-white p-4">
-              <div className="flex items-baseline justify-between gap-2">
-                <span className="font-semibold">
-                  {teamName(m, "home")}
-                  <span className="mx-1.5 text-slate-400">–</span>
-                  {teamName(m, "away")}
+              <div className="flex items-center justify-between gap-2">
+                <span className="flex min-w-0 items-center gap-1.5 font-semibold">
+                  <TeamCrest
+                    src={m.home_team_crest}
+                    name={teamName(m, "home")}
+                    size={22}
+                  />
+                  <span className="truncate">{teamName(m, "home")}</span>
+                  <span className="text-slate-400">–</span>
+                  <TeamCrest
+                    src={m.away_team_crest}
+                    name={teamName(m, "away")}
+                    size={22}
+                  />
+                  <span className="truncate">{teamName(m, "away")}</span>
                 </span>
                 {m.status === "FINISHED" ? (
                   <span className="shrink-0 text-lg font-bold tabular-nums">

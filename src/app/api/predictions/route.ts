@@ -46,7 +46,7 @@ export async function GET(request: Request) {
   const { data: matches } = await supabase
     .from("matches")
     .select(
-      "id, home_team_short, away_team_short, home_team, away_team, kickoff_at, status, home_goals, away_goals",
+      "id, home_team_short, away_team_short, home_team, away_team, home_team_crest, away_team_crest, kickoff_at, status, home_goals, away_goals",
     )
     .eq("matchday_id", matchdayId)
     .order("kickoff_at");
