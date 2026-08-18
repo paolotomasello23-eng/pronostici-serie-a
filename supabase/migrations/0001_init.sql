@@ -349,7 +349,18 @@ end $$;
 -- Queste due funzioni scrivono saltando RLS, quindi devono essere
 -- richiamabili solo dal nostro server (service_role), mai da un browser che
 -- punta direttamente all'API di Supabase.
+--
+-- Il grant esplicito dopo il revoke non è ridondante: in Postgres le
+-- funzioni nascono con EXECUTE concesso a PUBLIC, e revocarlo lì lo toglie
+-- a tutti — service_role compreso.
 revoke execute on function register_and_join(text, text, text)
   from public, anon, authenticated;
 revoke execute on function create_league_with_admin(text, int, text, text, text)
   from public, anon, authenticated;
+
+grant execute on function register_and_join(text, text, text) to service_role;
+grant execute on function create_league_with_admin(text, int, text, text, text)
+  to service_role;
+
+-- I privilegi di tabella stanno nella migrazione 0002: vanno eseguite
+-- entrambe, in ordine.

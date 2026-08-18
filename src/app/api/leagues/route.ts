@@ -63,6 +63,9 @@ export async function POST(request: Request) {
         { status: 409 },
       );
     }
+    // Nel browser un 500 generico non dice niente; nel terminale di
+    // `npm run dev` serve il messaggio vero del database.
+    console.error("[/api/leagues] creazione fallita:", error);
     return NextResponse.json(
       { error: "Non è stato possibile creare la lega." },
       { status: 500 },

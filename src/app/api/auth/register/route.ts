@@ -56,6 +56,7 @@ export async function POST(request: Request) {
         { status: 409 },
       );
     }
+    console.error("[/api/auth/register] iscrizione fallita:", error);
     return NextResponse.json(
       { error: "Non è stato possibile completare l'iscrizione." },
       { status: 500 },
