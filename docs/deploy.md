@@ -44,8 +44,16 @@ dal tuo `.env.local`:
 | `SUPABASE_JWT_SECRET` | `.env.local` |
 | `FOOTBALL_DATA_API_KEY` | `.env.local` |
 | `CRON_SECRET` | `.env.local` |
+| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | `.env.local` |
+| `VAPID_PRIVATE_KEY` | `.env.local` |
+| `VAPID_SUBJECT` | `.env.local` |
 
-Servono tutte e sei: senza, l'app parte e poi fallisce alla prima richiesta.
+Servono tutte: senza, l'app parte e poi fallisce alla prima richiesta.
+
+`NEXT_PUBLIC_VAPID_PUBLIC_KEY` va impostata **prima** del deploy, non dopo:
+le variabili con quel prefisso finiscono dentro il codice consegnato al
+browser al momento della compilazione. Aggiungerla più tardi richiede di
+rilanciare il deploy.
 
 A deploy finito hai un indirizzo tipo `https://nome-progetto.vercel.app`.
 Aprilo dal telefono e aggiungilo alla schermata Home: su iPhone *Condividi →
