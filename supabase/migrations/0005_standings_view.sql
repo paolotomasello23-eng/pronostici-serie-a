@@ -32,3 +32,6 @@ join matches   m on m.id = ps.match_id
 join matchdays d on d.id = m.matchday_id;
 
 grant select on v_scores_by_matchday to authenticated;
+-- Anche il server deve poterla leggere: senza questo, ogni uso della vista
+-- da codice lato server risponderebbe "permission denied for view".
+grant select on v_scores_by_matchday to service_role;

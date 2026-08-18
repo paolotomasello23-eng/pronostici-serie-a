@@ -89,11 +89,16 @@ describe.skipIf(!canRun)("punteggi scritti nel database", () => {
       carla: created[2].id,
     };
 
-    await admin.from("league_members").insert([
+    // `role` va ripetuto su ogni riga: in un insert multiplo Supabase
+    // allinea le colonne a quelle della prima riga, quindi le successive
+    // riceverebbero NULL esplicito invece del default 'player' — e l'intero
+    // inserimento verrebbe rifiutato.
+    const { error: membersError } = await admin.from("league_members").insert([
       { league_id: leagueId, player_id: players.anna, display_name: "Anna", role: "admin" },
-      { league_id: leagueId, player_id: players.bruno, display_name: "Bruno" },
-      { league_id: leagueId, player_id: players.carla, display_name: "Carla" },
+      { league_id: leagueId, player_id: players.bruno, display_name: "Bruno", role: "player" },
+      { league_id: leagueId, player_id: players.carla, display_name: "Carla", role: "player" },
     ]);
+    if (membersError) throw membersError;
 
     const kickoff = new Date(Date.now() - 86_400_000).toISOString();
 
@@ -134,7 +139,7 @@ describe.skipIf(!canRun)("punteggi scritti nel database", () => {
       home_goals: h, away_goals: a,
     });
 
-    await admin.from("predictions").insert([
+    const { error: predictionsError } = await admin.from("predictions").insert([
       // m1 finita 2-1: Anna esatta, Bruno prende l'esito, Carla sbaglia.
       // In due azzeccano l'1: niente bonus.
       p(players.anna, matches.m1, 2, 1),
@@ -149,6 +154,7 @@ describe.skipIf(!canRun)("punteggi scritti nel database", () => {
       p(players.bruno, matches.m3, 2, 2),
       p(players.carla, matches.m3, 0, 1),
     ]);
+    if (predictionsError) throw predictionsError;
   });
 
   afterAll(async () => {
