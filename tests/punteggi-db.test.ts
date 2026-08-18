@@ -1,6 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { SignJWT } from "jose";
 import { recomputeMatchday } from "@/lib/scoring/persist";
+import { computeStandings } from "@/lib/scoring";
 
 /**
  * Il motore di punteggio collegato al database vero.
@@ -15,7 +17,24 @@ import { recomputeMatchday } from "@/lib/scoring/persist";
 
 const URL_ = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const canRun = Boolean(URL_ && SERVICE_KEY);
+const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const JWT_SECRET = process.env.SUPABASE_JWT_SECRET;
+const canRun = Boolean(URL_ && SERVICE_KEY && ANON_KEY && JWT_SECRET);
+
+async function clientFor(playerId: string, leagueId: string) {
+  const token = await new SignJWT({ role: "authenticated", league_id: leagueId })
+    .setProtectedHeader({ alg: "HS256", typ: "JWT" })
+    .setSubject(playerId)
+    .setAudience("authenticated")
+    .setIssuedAt()
+    .setExpirationTime("1h")
+    .sign(new TextEncoder().encode(JWT_SECRET!));
+
+  return createClient(URL_!, ANON_KEY!, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { headers: { Authorization: `Bearer ${token}` } },
+  });
+}
 
 const TEST_SEASON = 1901;
 
@@ -236,6 +255,78 @@ describe.skipIf(!canRun)("punteggi scritti nel database", () => {
       .eq("id", matchdayId)
       .single();
     expect(day!.status).toBe("scored");
+  });
+
+  it("costruisce la classifica dalla vista, con gli spareggi giusti", async () => {
+    // Tutte e tre le partite finite: Anna e Bruno arrivano entrambi a 6.
+    await admin
+      .from("matches")
+      .update({ status: "FINISHED", home_goals: 1, away_goals: 1 })
+      .eq("id", matches.m3);
+    await recomputeMatchday(admin, { leagueId, matchdayId });
+
+    const asAnna = await clientFor(players.anna, leagueId);
+    const { data, error } = await asAnna
+      .from("v_scores_by_matchday")
+      .select("player_id, match_id, outcome_correct, exact, base_points, unique_bonus, points")
+      .eq("league_id", leagueId);
+
+    if (error && /does not exist|not find/i.test(error.message)) {
+      throw new Error(
+        "Manca la vista v_scores_by_matchday: esegui supabase/migrations/0005_standings_view.sql nell'SQL Editor.",
+      );
+    }
+    expect(error).toBeNull();
+
+    const standings = computeStandings(
+      (data ?? []).map((r) => ({
+        playerId: r.player_id as string,
+        matchId: r.match_id as string,
+        outcomeCorrect: r.outcome_correct as boolean,
+        exact: r.exact as boolean,
+        basePoints: r.base_points as number,
+        uniqueBonus: r.unique_bonus as number,
+        points: r.points as number,
+      })),
+      [
+        { playerId: players.anna, displayName: "Anna" },
+        { playerId: players.bruno, displayName: "Bruno" },
+        { playerId: players.carla, displayName: "Carla" },
+      ],
+    );
+
+    // Anna e Bruno sono a pari punti (6), ma Bruno ha azzeccato 3 esiti
+    // contro i 2 di Anna: passa avanti lui.
+    expect(standings.map((r) => [r.displayName, r.points, r.outcomeCount])).toEqual([
+      ["Bruno", 6, 3],
+      ["Anna", 6, 2],
+      ["Carla", 0, 0],
+    ]);
+    expect(standings.map((r) => r.rank)).toEqual([1, 2, 3]);
+  });
+
+  it("la vista non mostra i punteggi a chi non è nella lega", async () => {
+    // Il rischio vero di una vista: girare con i permessi di chi l'ha
+    // creata e diventare una scorciatoia per leggere dati altrui.
+    const { data: outsider } = await admin
+      .from("players")
+      .insert({ pin_hash: "t" })
+      .select("id")
+      .single();
+
+    const asOutsider = await clientFor(outsider!.id as string, leagueId);
+    const { data, error } = await asOutsider
+      .from("v_scores_by_matchday")
+      .select("player_id")
+      .eq("league_id", leagueId);
+
+    // Senza questo controllo il test passerebbe anche se la vista non
+    // esistesse affatto: "nessuna riga" e "nessuna tabella" si assomigliano
+    // troppo per fidarsi del solo conteggio.
+    expect(error).toBeNull();
+    expect(data ?? []).toHaveLength(0);
+
+    await admin.from("players").delete().eq("id", outsider!.id as string);
   });
 
   it("toglie i punti se una partita torna a non essere finita", async () => {
