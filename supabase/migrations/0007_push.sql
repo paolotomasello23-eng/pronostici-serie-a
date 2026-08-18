@@ -45,3 +45,15 @@ alter table push_reminders     enable row level security;
 -- Nessuna policy: si toccano solo dal server. Le iscrizioni contengono le
 -- chiavi di cifratura del dispositivo, non c'è motivo perché un browser
 -- possa leggerle — nemmeno le proprie.
+
+-- I GRANT della migrazione 0002 valevano per le tabelle che esistevano
+-- allora: una tabella nuova nasce senza permessi per nessuno, e il server
+-- si vedrebbe rispondere "permission denied" al primo salvataggio.
+grant select, insert, update, delete on push_subscriptions to service_role;
+grant select, insert, update, delete on push_reminders     to service_role;
+
+-- E perché la stessa dimenticanza non si ripeta alla prossima tabella:
+-- da qui in avanti quelle create in questo schema nascono già accessibili
+-- al server.
+alter default privileges in schema public
+  grant select, insert, update, delete on tables to service_role;
