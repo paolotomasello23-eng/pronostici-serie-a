@@ -30,4 +30,8 @@ export const env = {
   get supabaseJwtSecret() {
     return required("SUPABASE_JWT_SECRET");
   },
+  /** Chiave football-data.org: solo server, mai esposta al browser. */
+  get footballDataApiKey() {
+    return required("FOOTBALL_DATA_API_KEY");
+  },
 };
