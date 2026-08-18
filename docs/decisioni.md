@@ -97,7 +97,7 @@ pausa-campionato serve un ping settimanale, previsto in M7.
 | M1 | Motore di punteggio puro + test | ✅ |
 | M2 | Schema DB + RLS + login PIN + lega con codice invito | ✅ |
 | M3 | Sync partite football-data + inserimento manuale | ✅ |
-| M4 | Inserimento pronostici + lock server-side | — |
+| M4 | Inserimento pronostici + lock server-side | ✅ |
 | M5 | Sync risultati + scoring su DB + ricalcolo forzato | — |
 | M6 | Classifica generale + dettaglio giornata | — |
 | M7 | Scheduler + deploy + polish mobile | — |

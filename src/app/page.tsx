@@ -121,6 +121,13 @@ export default async function Home() {
             </p>
           )}
 
+          <a
+            href="/pronostici"
+            className="mb-4 block rounded-xl bg-slate-900 px-5 py-4 text-center text-lg font-semibold text-white active:bg-slate-700"
+          >
+            {isLocked ? "Vedi i pronostici di tutti" : "Fai i tuoi pronostici"}
+          </a>
+
           <ul className="flex flex-col gap-2">
             {(matches ?? []).map((m) => (
               <li
