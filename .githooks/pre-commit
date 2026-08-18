@@ -24,11 +24,16 @@ done
 #    sono vuoti per definizione.
 for file in $staged; do
   case "$file" in
-    *.example|.githooks/*) continue ;;
+    # I lockfile sono generati e pieni di hash base64 che somigliano a
+    # tutto: controllarli produce solo falsi allarmi.
+    *.example|.githooks/*|package-lock.json|*/package-lock.json) continue ;;
   esac
   [ -f "$file" ] || continue
 
-  if grep -nE 'eyJ[A-Za-z0-9_-]{20,}' "$file" >/dev/null 2>&1; then
+  # Un JWT ha tre parti separate da punti, e le prime due sono JSON in
+  # base64 (quindi iniziano per "eyJ"). Cercare il solo "eyJ" pescherebbe
+  # qualunque hash che comincia per caso in quel modo.
+  if grep -nE 'eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]+' "$file" >/dev/null 2>&1; then
     echo "BLOCCATO: $file contiene quello che sembra un JWT."
     fail=1
   fi

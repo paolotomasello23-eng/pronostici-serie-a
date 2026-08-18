@@ -95,7 +95,7 @@ pausa-campionato serve un ping settimanale, previsto in M7.
 |---|---|---|
 | M0 | Setup: Next.js, Tailwind, Vitest, repo | ✅ |
 | M1 | Motore di punteggio puro + test | ✅ |
-| M2 | Schema DB + RLS + login PIN + lega con codice invito | — |
+| M2 | Schema DB + RLS + login PIN + lega con codice invito | ✅ |
 | M3 | Sync partite football-data + inserimento manuale | — |
 | M4 | Inserimento pronostici + lock server-side | — |
 | M5 | Sync risultati + scoring su DB + ricalcolo forzato | — |
