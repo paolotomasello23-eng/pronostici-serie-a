@@ -59,29 +59,33 @@ export default function RegolePage() {
         <h2 className="text-lg font-semibold">Modalità di gioco</h2>
         <p>
           Per ogni giornata di campionato, ciascun partecipante è tenuto a
-          pronosticare il risultato esatto delle 10 partite di Serie A.
+          pronosticare il <strong>risultato esatto</strong> delle 10 partite di
+          Serie A.
         </p>
         <ul className="flex list-disc flex-col gap-2 pl-5 text-sm text-slate-700 marker:text-slate-400">
           <li>
             I pronostici possono essere liberamente inseriti o modificati fino
-            all&apos;orario ufficiale del fischio d&apos;inizio della prima
-            giornata. Contestualmente all&apos;avvio della prima gara, il
-            sistema bloccherà le partite e non sarà più possibile modificare i
-            propri pronostici.
+            all&apos;orario ufficiale del{" "}
+            <strong>fischio d&apos;inizio della prima giornata</strong>.
+            Contestualmente all&apos;avvio della prima gara, il sistema
+            bloccherà le partite e{" "}
+            <strong>non sarà più possibile modificare</strong> i propri
+            pronostici.
           </li>
           <li>
-            Il salvataggio dei pronostici avviene in tempo reale e in modo
-            automatico. Sarà infatti possibile pronosticare alcune partite in un
-            momento ed altre in un altro.
+            Il salvataggio dei pronostici avviene{" "}
+            <strong>in tempo reale e in modo automatico</strong>. Sarà infatti
+            possibile pronosticare alcune partite in un momento ed altre in un
+            altro.
           </li>
           <li>
             Gli incontri privi di pronostico al momento della chiusura
-            comporteranno l&apos;assegnazione di 0 punti.
+            comporteranno l&apos;assegnazione di <strong>0 punti</strong>.
           </li>
           <li>
-            Fino al momento del blocco definitivo i pronostici rimarranno
-            riservati. A termini scaduti sarà possibile vedere i pronostici di
-            tutti i partecipanti.
+            Fino al momento del blocco definitivo i pronostici rimarranno{" "}
+            <strong>riservati</strong>. A termini scaduti sarà possibile{" "}
+            <strong>vedere i pronostici di tutti</strong> i partecipanti.
           </li>
         </ul>
       </section>
@@ -124,8 +128,7 @@ export default function RegolePage() {
           <div className="min-w-0">
             <p className="text-sm text-slate-700">
               Cumulabile con i punti base, a condizione che almeno 3
-              partecipanti abbiano inserito un pronostico per la partita in
-              questione.
+              partecipanti abbiano inserito un pronostico.
             </p>
             <ul className="mt-2 flex flex-col gap-1 text-sm">
               <li className="flex items-baseline justify-between gap-3">
@@ -152,7 +155,7 @@ export default function RegolePage() {
 
         <p className="text-xs italic text-slate-500">
           Punteggio massimo teorico per singola gara: 5 punti, derivante da 3
-          punti per il risultato esatto + 2 punti di bonus controcorrente.
+          punti per il risultato esatto + 2 punti di bonus.
         </p>
       </section>
 
@@ -168,15 +171,6 @@ export default function RegolePage() {
           <li>Maggior numero complessivo di risultati esatti indovinati.</li>
         </ol>
       </section>
-
-      <div className="pb-4">
-        <a
-          href="/pronostici"
-          className="block rounded-xl bg-slate-900 px-5 py-4 text-center text-lg font-semibold text-white active:bg-slate-700"
-        >
-          Vai ai pronostici
-        </a>
-      </div>
     </main>
   );
 }
