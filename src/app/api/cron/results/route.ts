@@ -4,6 +4,7 @@ import { serviceClient } from "@/lib/supabase/server";
 import { applyMatchday, logSyncRun } from "@/lib/matches/apply";
 import { fetchMatchdayFromApi } from "@/lib/matches/football-data";
 import { recomputeMatchday } from "@/lib/scoring/persist";
+import { notifyResults } from "@/lib/push/results";
 import { env } from "@/lib/env";
 
 /** Quante giornate incompiute guardare a ogni giro. */
@@ -73,6 +74,17 @@ export async function POST(request: Request) {
           leagueId: league.id as string,
           matchdayId: day.id as string,
         });
+
+        // Solo a giornata conclusa: avvisare a metà, quando mancano ancora
+        // dei risultati, darebbe una classifica che cambia il giorno dopo.
+        if (last.complete) {
+          await notifyResults(admin, {
+            leagueId: league.id as string,
+            matchdayId: day.id as string,
+            matchdayNumber: number,
+            season,
+          });
+        }
       }
 
       report.push({

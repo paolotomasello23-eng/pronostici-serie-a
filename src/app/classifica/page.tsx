@@ -135,7 +135,7 @@ export default async function ClassificaPage({
               />
 
               <a
-                href="/pronostici"
+                href={`/pronostici?giornata=${selected}`}
                 className="mt-3 block text-sm text-slate-600 underline"
               >
                 Vedi chi ha pronosticato cosa

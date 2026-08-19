@@ -17,6 +17,15 @@ interface MatchRow {
   away_goals: number | null;
 }
 
+interface PlayerRow {
+  playerId: string;
+  displayName: string;
+  username: string | null;
+  isAdmin: boolean;
+  failedAttempts: number;
+  lockedUntil: string | null;
+}
+
 interface MatchdayInfo {
   id: string;
   lock_at: string | null;
@@ -51,6 +60,18 @@ export default function AdminPage() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [players, setPlayers] = useState<PlayerRow[]>([]);
+
+  const loadPlayers = useCallback(async () => {
+    const r = await fetch("/api/admin/players");
+    if (!r.ok) return;
+    const d = await r.json();
+    setPlayers(d.players ?? []);
+  }, []);
+
+  useEffect(() => {
+    void loadPlayers();
+  }, [loadPlayers]);
 
   useEffect(() => {
     fetch("/api/admin/current")
@@ -105,6 +126,47 @@ export default function AdminPage() {
           (d.lockedAlready ? " Giornata già bloccata: il lock non è stato toccato." : ""),
       );
       await load();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /**
+   * Assegna un PIN nuovo a chi lo ha dimenticato.
+   *
+   * Il vecchio non è recuperabile: nel database c'è solo la sua impronta,
+   * quindi si può soltanto sostituirlo.
+   */
+  async function resetPin(player: PlayerRow) {
+    const pin = window.prompt(
+      `Nuovo PIN per ${player.displayName} (6 cifre).
+
+` +
+        "Il PIN attuale non è recuperabile: questo lo sostituisce. " +
+        "Comunicaglielo tu, e digli di cambiarlo appena entra.",
+    );
+    if (pin === null) return;
+
+    if (!/^\d{6}$/.test(pin)) {
+      setError("Il PIN deve essere di 6 cifre.");
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const r = await fetch("/api/admin/players", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ playerId: player.playerId, pin }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error ?? "Errore");
+      setMessage(`PIN di ${player.displayName} reimpostato.`);
+      await loadPlayers();
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -463,6 +525,52 @@ export default function AdminPage() {
             Nessuna partita. Scaricala dall&apos;API o aggiungila a mano.
           </p>
         )}
+      </section>
+
+      <section className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+        <div>
+          <h2 className="font-semibold">Giocatori</h2>
+          <p className="text-sm text-slate-500">
+            Chi dimentica il PIN non può recuperarlo da solo: puoi assegnargliene
+            uno nuovo.
+          </p>
+        </div>
+
+        <ul className="flex flex-col gap-2">
+          {players.map((player) => (
+            <li
+              key={player.playerId}
+              className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 px-3 py-2.5"
+            >
+              <span className="min-w-0">
+                <span
+                  className={`block truncate font-medium ${
+                    player.isAdmin ? "text-amber-500" : ""
+                  }`}
+                >
+                  {player.displayName}
+                </span>
+                <span className="block text-xs text-slate-500">
+                  {player.lockedUntil
+                    ? "bloccato per troppi tentativi"
+                    : player.failedAttempts > 0
+                      ? `${player.failedAttempts} tentativi falliti`
+                      : `accede come ${player.username ?? "?"}`}
+                </span>
+              </span>
+              <button
+                onClick={() => resetPin(player)}
+                disabled={busy}
+                className="shrink-0 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium disabled:opacity-50"
+              >
+                Nuovo PIN
+              </button>
+            </li>
+          ))}
+          {players.length === 0 && (
+            <li className="text-sm text-slate-500">Nessun giocatore.</li>
+          )}
+        </ul>
       </section>
 
       <button

@@ -57,7 +57,15 @@ function teamName(m: Match, side: "home" | "away"): string {
     : (m.away_team_short ?? m.away_team);
 }
 
-export function PronosticiForm({ matchdayId }: { matchdayId: string }) {
+export function PronosticiForm({
+  matchdayId,
+  giornate,
+  corrente,
+}: {
+  matchdayId: string;
+  giornate: { number: number }[];
+  corrente: number;
+}) {
   const [data, setData] = useState<Payload | null>(null);
   const [draft, setDraft] = useState<Draft>({});
   const [saveState, setSaveState] = useState<SaveState>("idle");
@@ -154,6 +162,24 @@ export function PronosticiForm({ matchdayId }: { matchdayId: string }) {
         <h1 className="text-2xl font-bold tracking-tight">
           Giornata {data.matchday.number}
         </h1>
+
+        {giornate.length > 1 && (
+          <div className="mt-3 flex flex-wrap justify-center gap-2">
+            {giornate.map((g) => (
+              <a
+                key={g.number}
+                href={`/pronostici?giornata=${g.number}`}
+                className={`rounded-lg px-3 py-1.5 text-sm font-medium ${
+                  g.number === corrente
+                    ? "bg-slate-900 text-white"
+                    : "border border-slate-300 bg-white text-slate-700"
+                }`}
+              >
+                {g.number}
+              </a>
+            ))}
+          </div>
+        )}
         {data.isLocked && (
           <p className="mt-1 text-sm font-medium text-amber-700">Bloccata</p>
         )}
