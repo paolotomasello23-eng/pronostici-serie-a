@@ -3,16 +3,46 @@ import { isAuthorizedCron } from "@/lib/cron/auth";
 import { serviceClient } from "@/lib/supabase/server";
 import { sendToPlayer } from "@/lib/push/send";
 
-/** Quanto prima del blocco far partire il promemoria. */
-const WINDOW_HOURS = 6;
-
 /**
- * Avvisa chi non ha ancora finito di pronosticare.
+ * Le tre chiamate prima del blocco.
  *
- * Parte solo nelle ore che precedono il blocco e solo per chi ha davvero
- * delle partite in bianco: una notifica a chi ha già compilato tutto è il
- * modo più rapido per far disattivare le notifiche a tutti.
+ * Le finestre non si sovrappongono e ogni fase parte una volta sola per
+ * giornata e per persona: la riga in `push_reminders` viene scritta prima
+ * dell'invio, quindi un cron che gira ogni dieci minuti non produce dieci
+ * notifiche uguali.
+ *
+ * Ordine dalla più lontana alla più vicina al fischio d'inizio.
  */
+const FASI = [
+  {
+    kind: "8h",
+    /** Vale quando mancano fra 4 e 8 ore. */
+    da: 4,
+    a: 8,
+    /** A tutti, anche a chi ha già finito. */
+    soloIncompleti: false,
+    titolo: () => "8 ore al calcio d'inizio",
+    testo: () => "Dai un'occhiata ai tuoi pronostici",
+  },
+  {
+    kind: "4h",
+    da: 0.5,
+    a: 4,
+    soloIncompleti: true,
+    titolo: (nome: string) => `Svegliaaa ${nome}!!!!`,
+    testo: (_nome: string, mancanti: number) =>
+      `Devi ancora completare ${mancanti} pronostic${mancanti === 1 ? "o" : "i"}!`,
+  },
+  {
+    kind: "30m",
+    da: 0,
+    a: 0.5,
+    soloIncompleti: false,
+    titolo: () => "Manca poco ormai",
+    testo: () => "Avrai messo le scelte giuste??",
+  },
+] as const;
+
 export async function POST(request: Request) {
   if (!isAuthorizedCron(request)) {
     return NextResponse.json({ error: "Non autorizzato." }, { status: 401 });
@@ -22,21 +52,27 @@ export async function POST(request: Request) {
 
   try {
     const now = new Date();
-    const until = new Date(now.getTime() + WINDOW_HOURS * 3_600_000);
+    const massimo = new Date(now.getTime() + 8 * 3_600_000);
 
     const { data: matchdays } = await admin
       .from("matchdays")
       .select("id, number, lock_at")
       .gt("lock_at", now.toISOString())
-      .lte("lock_at", until.toISOString());
+      .lte("lock_at", massimo.toISOString());
 
     if (!matchdays || matchdays.length === 0) {
       return NextResponse.json({ ok: true, message: "Nessun blocco in vista." });
     }
 
-    const report: Array<{ matchday: number; notified: number; skipped: number }> = [];
+    const report: Array<{ matchday: number; fase: string; inviate: number }> = [];
 
     for (const matchday of matchdays) {
+      const oreMancanti =
+        (new Date(matchday.lock_at as string).getTime() - now.getTime()) / 3_600_000;
+
+      const fase = FASI.find((f) => oreMancanti > f.da && oreMancanti <= f.a);
+      if (!fase) continue;
+
       const { data: matches } = await admin
         .from("matches")
         .select("id")
@@ -47,72 +83,57 @@ export async function POST(request: Request) {
 
       const { data: members } = await admin
         .from("league_members")
-        .select("player_id, league_id, display_name");
+        .select("player_id, display_name");
 
       const { data: predictions } = await admin
         .from("predictions")
         .select("player_id")
         .in("match_id", matchIds);
 
-      const compiled = new Map<string, number>();
+      const compilati = new Map<string, number>();
       for (const p of predictions ?? []) {
         const id = p.player_id as string;
-        compiled.set(id, (compiled.get(id) ?? 0) + 1);
+        compilati.set(id, (compilati.get(id) ?? 0) + 1);
       }
 
-      const hoursLeft = Math.max(
-        1,
-        Math.round(
-          (new Date(matchday.lock_at as string).getTime() - now.getTime()) / 3_600_000,
-        ),
-      );
-
-      let notified = 0;
-      let skipped = 0;
+      let inviate = 0;
 
       for (const member of members ?? []) {
         const playerId = member.player_id as string;
-        const done = compiled.get(playerId) ?? 0;
-        const missing = matchIds.length - done;
+        const nome = member.display_name as string;
+        const mancanti = matchIds.length - (compilati.get(playerId) ?? 0);
 
-        if (missing <= 0) {
-          skipped++;
-          continue;
-        }
+        if (fase.soloIncompleti && mancanti <= 0) continue;
 
-        // L'inserimento è il lucchetto: se la riga c'è già, il promemoria
-        // è partito e non si ripete. Prima di inviare, non dopo, così un
+        // L'inserimento è il lucchetto: se la riga c'è già, quella fase è
+        // partita e non si ripete. Prima di inviare, non dopo, così un
         // errore a metà non produce comunque un doppione.
-        const { error: alreadySent } = await admin
-          .from("push_reminders")
-          .insert({
-            matchday_id: matchday.id as string,
-            player_id: playerId,
-            kind: "lock",
-          });
-
-        if (alreadySent) {
-          skipped++;
-          continue;
-        }
-
-        const result = await sendToPlayer(admin, playerId, {
-          title: `Giornata ${matchday.number}: mancano ${missing} pronostici`,
-          body:
-            hoursLeft <= 1
-              ? "Si blocca tra meno di un'ora."
-              : `Si blocca tra circa ${hoursLeft} ore.`,
-          url: "/pronostici",
-          tag: `lock-${matchday.id}`,
+        const { error: giaInviata } = await admin.from("push_reminders").insert({
+          matchday_id: matchday.id as string,
+          player_id: playerId,
+          kind: fase.kind,
         });
 
-        if (result.sent > 0) notified++;
+        if (giaInviata) continue;
+
+        const esito = await sendToPlayer(admin, playerId, {
+          title: fase.titolo(nome),
+          body: fase.testo(nome, mancanti),
+          url: "/pronostici",
+          tag: `${fase.kind}-${matchday.id}`,
+        });
+
+        if (esito.sent > 0) inviate++;
       }
 
-      report.push({ matchday: matchday.number as number, notified, skipped });
+      report.push({
+        matchday: matchday.number as number,
+        fase: fase.kind,
+        inviate,
+      });
     }
 
-    return NextResponse.json({ ok: true, matchdays: report });
+    return NextResponse.json({ ok: true, fasi: report });
   } catch (error) {
     console.error("[cron/reminders] fallito:", error);
     return NextResponse.json(

@@ -1,12 +1,15 @@
 name: Promemoria pronostici
 
-# Ogni ora: l'endpoint decide da solo se è il momento, cioè se un blocco
-# cade nelle sei ore successive e qualcuno ha ancora partite in bianco.
-# Chi ha già ricevuto il promemoria per quella giornata non lo riceve due
-# volte, quindi far girare spesso non fa danni.
+# Ogni dieci minuti: e' l'endpoint a decidere se sia il momento di una delle
+# tre chiamate. La piu' vicina al fischio d'inizio ha una finestra di mezz'ora,
+# e con un giro all'ora la mancheremmo quasi sempre.
+#
+# Ogni fase parte una volta sola per giornata e per persona, quindi far girare
+# spesso non produce notifiche ripetute. Dalle 5 alle 23 UTC: prima non si
+# gioca, e nessun blocco cade a notte fonda.
 on:
   schedule:
-    - cron: "5 * * * *"
+    - cron: "*/10 5-23 * * *"
   workflow_dispatch:
 
 jobs:
