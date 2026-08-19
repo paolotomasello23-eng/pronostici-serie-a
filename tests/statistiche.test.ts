@@ -71,9 +71,11 @@ describe("statistiche dei giocatori", () => {
     });
   });
 
-  it("conta i bonus 'unico', che valgono il trofeo competenza", () => {
+  it("conta i bonus controcorrente, in occasioni e in punti", () => {
     expect(of("Bruno").uniqueBonusCount).toBe(2);
+    expect(of("Bruno").uniqueBonusPoints).toBe(2);
     expect(of("Anna").uniqueBonusCount).toBe(0);
+    expect(of("Anna").uniqueBonusPoints).toBe(0);
   });
 
   it("conta le partite chiuse a zero", () => {
@@ -153,10 +155,10 @@ describe("trofei", () => {
   const trophies = computeTrophies(stats);
   const trophy = (key: string) => trophies.find((t) => t.key === key);
 
-  it("assegna la competenza a chi ha più bonus 'unico'", () => {
+  it("assegna la competenza a chi ha più punti controcorrente", () => {
     expect(trophy("competenza")).toMatchObject({
       winners: ["Bruno"],
-      value: "2 volte",
+      value: "2 punti",
     });
   });
 

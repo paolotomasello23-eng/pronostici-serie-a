@@ -10,22 +10,27 @@ import type { MatchResult, PlayerRef, Prediction } from "@/lib/scoring";
  *
  * TABELLA DI VERIFICA (calcolata a mano, riga per riga)
  *
- * m1  2-1 (1) | Anna 2-1 esatto=3 | Bruno 1-0 esito=1 | Carla 1-1 =0 | Dario 0-1 =0
- *             -> in due azzeccano l'esito, niente bonus
- * m2  0-0 (X) | Anna 1-0 =0 | Bruno 0-0 esatto+unico=4 | Carla 2-1 =0 | Dario 1-2 =0
+ * Bonus: 2 punti in palio per partita, a chi azzecca andando controcorrente.
+ * Uno solo indovina -> 2 punti a lui. In due -> 1 a testa. In tre -> niente.
+ *
+ * m1  2-1 (1) | Anna 2-1 esatto=3+1 | Bruno 1-0 esito=1+1 | Carla 1-1 =0 | Dario 0-1 =0
+ *             -> azzeccano in due: 1 punto di bonus a testa
+ * m2  0-0 (X) | Anna 1-0 =0 | Bruno 0-0 esatto+2=5 | Carla 2-1 =0 | Dario 1-2 =0
  * m3  1-3 (2) | Anna 0-2 =1 | Bruno 1-2 =1 | Carla 0-1 =1 | Dario 2-0 =0
- *             -> in tre azzeccano, niente bonus
- * m4  2-2 (X) | Anna 1-1 esito+unico=2 | Bruno 2-1 =0 | Carla 0-2 =0 | Dario 3-1 =0
+ *             -> azzeccano in tre: niente bonus
+ * m4  2-2 (X) | Anna 1-1 esito+2=3 | Bruno 2-1 =0 | Carla 0-2 =0 | Dario 3-1 =0
  * m5  1-0 (1) | Anna 2-0 =1 | Bruno 1-0 esatto=3 | Carla 1-0 esatto=3 | Dario 0-0 =0
- * m6  0-2 (2) | Anna 0-1 =1 | Bruno 1-1 =0 | Carla 2-1 =0 | Dario 0-2 esatto=3
- * m7  3-1 (1) | Anna 1-2 =0 | Bruno 0-1 =0 | Carla 3-1 esatto+unico=4 | Dario 1-1 =0
+ *             -> azzeccano in tre: niente bonus
+ * m6  0-2 (2) | Anna 0-1 =1+1 | Bruno 1-1 =0 | Carla 2-1 =0 | Dario 0-2 esatto=3+1
+ * m7  3-1 (1) | Anna 1-2 =0 | Bruno 0-1 =0 | Carla 3-1 esatto+2=5 | Dario 1-1 =0
  * m8  1-1 (X) | Anna 1-1 esatto=3 | Bruno 2-2 =1 | Carla 1-0 =0 | Dario 0-0 =1
+ *             -> azzeccano in tre: niente bonus
  * m9  0-1 (2) | Anna 0-1 esatto=3 | Bruno 1-0 =0 | Carla e Dario non pronosticano
  *             -> solo 2 pronostici: sotto la soglia, Anna NON prende il bonus
  * m10 RINVIATA -> nessun punto, anche se tutti hanno pronosticato
  *
- * TOTALI  Anna 14 (7 esiti, 3 esatti) | Bruno 10 (5, 2)
- *         Carla 8 (3, 2)              | Dario 4 (2, 1)
+ * TOTALI  Anna 17 (7 esiti, 3 esatti) | Bruno 12 (5, 2)
+ *         Carla 9 (3, 2)              | Dario 5 (2, 1)
  */
 
 const PLAYERS: PlayerRef[] = [
@@ -78,16 +83,16 @@ describe("giornata completa", () => {
     expect(
       standings.map((r) => [r.displayName, r.points, r.outcomeCount, r.exactCount]),
     ).toEqual([
-      ["Anna", 14, 7, 3],
-      ["Bruno", 10, 5, 2],
-      ["Carla", 8, 3, 2],
-      ["Dario", 4, 2, 1],
+      ["Anna", 17, 7, 3],
+      ["Bruno", 12, 5, 2],
+      ["Carla", 9, 3, 2],
+      ["Dario", 5, 2, 1],
     ]);
   });
 
-  it("assegna 36 punti in totale sulla giornata", () => {
+  it("assegna 43 punti in totale sulla giornata", () => {
     const total = scores.reduce((sum, s) => sum + s.points, 0);
-    expect(total).toBe(36);
+    expect(total).toBe(43);
   });
 
   it("non assegna punti per la partita rinviata", () => {
@@ -130,10 +135,10 @@ describe("recupero della partita rinviata", () => {
     expect(
       standings.map((r) => [r.displayName, r.points, r.outcomeCount]),
     ).toEqual([
-      ["Anna", 15, 8],
-      ["Bruno", 11, 6],
-      ["Carla", 8, 3],
-      ["Dario", 4, 2],
+      ["Anna", 19, 8],
+      ["Bruno", 14, 6],
+      ["Carla", 9, 3],
+      ["Dario", 5, 2],
     ]);
   });
 });

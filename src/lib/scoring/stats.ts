@@ -21,8 +21,14 @@ export interface PlayerStats {
   points: number;
   outcomeCount: number;
   exactCount: number;
-  /** I +1 presi essendo l'unico ad averci visto giusto: il "trofeo competenza". */
+  /** Quante volte ha preso un bonus controcorrente. */
   uniqueBonusCount: number;
+  /**
+   * Punti di bonus accumulati: è questo il "trofeo competenza". Conta i
+   * punti e non le occasioni, perché prendersi tutti e 2 i punti da soli
+   * vale il doppio che dividerli con un altro.
+   */
+  uniqueBonusPoints: number;
   /** Giornate in cui ha giocato almeno una partita. */
   matchdaysPlayed: number;
   /** Punti per giornata giocata. Confronta chi ha saltato delle giornate. */
@@ -53,6 +59,7 @@ export function computePlayerStats(
       outcomeCount: 0,
       exactCount: 0,
       uniqueBonusCount: 0,
+      uniqueBonusPoints: 0,
       matchdaysPlayed: 0,
       averagePerMatchday: 0,
       outcomeRate: 0,
@@ -73,6 +80,7 @@ export function computePlayerStats(
     if (score.outcomeCorrect) row.outcomeCount += 1;
     if (score.exact) row.exactCount += 1;
     if (score.uniqueBonus > 0) row.uniqueBonusCount += 1;
+    row.uniqueBonusPoints += score.uniqueBonus;
     if (score.points === 0) row.blanks += 1;
 
     const days = perMatchday.get(score.playerId)!;
@@ -165,9 +173,9 @@ export function computeTrophies(stats: readonly PlayerStats[]): Trophy[] {
     {
       key: "competenza",
       title: "Competenza",
-      description: "Più volte l'unico ad azzeccare una partita",
-      pick: (s) => s.uniqueBonusCount,
-      format: (n) => `${n} volte`,
+      description: "Più punti presi andando controcorrente",
+      pick: (s) => s.uniqueBonusPoints,
+      format: (n) => `${n} punti`,
     },
     {
       key: "esiti",

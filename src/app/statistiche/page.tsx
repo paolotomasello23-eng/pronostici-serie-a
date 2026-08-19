@@ -126,7 +126,10 @@ export default async function StatistichePage() {
                     <Row label="Esiti azzeccati" value={player.outcomeCount} />
                     <Row label="Precisione" value={`${player.outcomeRate}%`} />
                     <Row label="Risultati esatti" value={player.exactCount} />
-                    <Row label="Bonus unico" value={player.uniqueBonusCount} />
+                    <Row
+                      label="Punti controcorrente"
+                      value={player.uniqueBonusPoints}
+                    />
                     <Row
                       label="Media a giornata"
                       value={player.averagePerMatchday}

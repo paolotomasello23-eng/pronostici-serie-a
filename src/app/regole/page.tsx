@@ -35,10 +35,12 @@ export default function RegolePage() {
             </span>
           </li>
           <li className="rounded-xl border border-slate-200 bg-white px-4 py-3">
-            <span className="text-xl font-bold">+1 bonus</span>
+            <span className="text-xl font-bold">+2 bonus</span>
             <span className="block text-sm text-slate-600">
-              se sei l&apos;unico del gruppo ad aver indovinato come finiva
-              quella partita
+              ogni partita mette in palio 2 punti per chi va controcorrente:
+              se sei l&apos;unico a indovinare li prendi tutti, se siete in
+              due fate 1 punto a testa, se siete in tre o più non li prende
+              nessuno
             </span>
           </li>
         </ul>
@@ -65,10 +67,15 @@ export default function RegolePage() {
           </li>
         </ul>
         <p className="text-sm text-slate-600">
-          E se tutti avevano puntato sul Milan e solo tu sul Torino, ti becchi
-          anche il bonus: 1+1 = <strong>2 punti</strong>, oppure 3+1 ={" "}
-          <strong>4 punti</strong> se avevi anche il risultato giusto. Il bonus
-          vale solo se almeno in tre hanno pronosticato quella partita.
+          E se tutti avevano puntato sul Milan e solo tu sul Torino, ti prendi
+          anche i 2 punti di bonus: 1+2 = <strong>3 punti</strong>, oppure
+          3+2 = <strong>5 punti</strong> se avevi indovinato pure il
+          risultato. Se invece anche un altro aveva detto Torino, il bonus si
+          divide: 1 punto a testa. In tre o più non lo prende nessuno.
+        </p>
+        <p className="text-sm text-slate-600">
+          Il bonus vale solo se almeno in tre hanno pronosticato quella
+          partita.
         </p>
       </section>
 

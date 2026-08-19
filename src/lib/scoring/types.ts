@@ -34,7 +34,10 @@ export interface MatchScore {
   exact: boolean;
   /** 3 se esatto, 1 se solo l'esito, 0 altrimenti. Mai la somma dei due. */
   basePoints: number;
-  /** 1 se è l'unico ad aver azzeccato l'esito (a soglia raggiunta), altrimenti 0. */
+  /**
+   * Bonus controcorrente: 2 se è stato l'unico ad azzeccare l'esito, 1 se
+   * in due, 0 se in tre o più (o sotto la soglia di pronostici).
+   */
   uniqueBonus: number;
   /** basePoints + uniqueBonus. */
   points: number;
@@ -42,9 +45,9 @@ export interface MatchScore {
 
 export interface ScoringConfig {
   /**
-   * Numero minimo di pronostici sulla partita perché il bonus "unico" possa
-   * essere assegnato. Serve a evitare che chi è l'unico ad aver compilato
-   * quella riga incassi il bonus a tavolino.
+   * Numero minimo di pronostici sulla partita perché il bonus controcorrente
+   * possa essere assegnato. Serve a evitare che chi è l'unico ad aver
+   * compilato quella riga incassi il bonus a tavolino.
    */
   uniqueBonusMinPredictions: number;
 }

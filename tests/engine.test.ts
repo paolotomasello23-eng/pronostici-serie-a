@@ -32,13 +32,15 @@ describe("outcomeOf", () => {
 });
 
 describe("punti base", () => {
-  // Due giocatori azzeccano l'esito: nessun bonus in gioco, così i punti
-  // base si osservano puliti.
+  // Tre giocatori azzeccano l'esito, quindi il bonus non entra in gioco e i
+  // punti base si osservano puliti. Con due indovini scatterebbe il bonus e
+  // i totali non direbbero più solo dei punti base.
   const predictions = [
     pred("anna", "m1", 2, 1), // risultato esatto
     pred("bruno", "m1", 3, 1), // esito giusto, risultato sbagliato
-    pred("carla", "m1", 1, 1), // esito sbagliato (X)
-    pred("dario", "m1", 0, 2), // esito sbagliato (2)
+    pred("carla", "m1", 4, 0), // esito giusto, risultato sbagliato
+    pred("dario", "m1", 1, 1), // esito sbagliato (X)
+    pred("elio", "m1", 0, 2), // esito sbagliato (2)
   ];
   const scores = scoreMatch(result("m1", 2, 1), predictions);
 
@@ -59,8 +61,8 @@ describe("punti base", () => {
   });
 
   it("assegna 0 punti a chi sbaglia l'esito", () => {
-    expect(of(scores, "carla").points).toBe(0);
     expect(of(scores, "dario").points).toBe(0);
+    expect(of(scores, "elio").points).toBe(0);
   });
 
   it("non somma mai 3 e 1: il risultato esatto vale 3, non 4", () => {
@@ -79,8 +81,8 @@ describe("punti base", () => {
   });
 });
 
-describe("bonus unico", () => {
-  it("dà +1 a chi è l'unico con l'esito giusto: 1 + 1 = 2", () => {
+describe("bonus controcorrente", () => {
+  it("dà tutti e 2 i punti a chi è l'unico con l'esito giusto: 1 + 2 = 3", () => {
     const scores = scoreMatch(result("m1", 2, 1), [
       pred("anna", "m1", 3, 1), // unico con esito 1, risultato sbagliato
       pred("bruno", "m1", 1, 1),
@@ -88,11 +90,11 @@ describe("bonus unico", () => {
     ]);
     const anna = of(scores, "anna");
     expect(anna.basePoints).toBe(1);
-    expect(anna.uniqueBonus).toBe(1);
-    expect(anna.points).toBe(2);
+    expect(anna.uniqueBonus).toBe(2);
+    expect(anna.points).toBe(3);
   });
 
-  it("si somma al risultato esatto: 3 + 1 = 4", () => {
+  it("si somma al risultato esatto: 3 + 2 = 5", () => {
     const scores = scoreMatch(result("m1", 2, 1), [
       pred("anna", "m1", 2, 1), // esatto e unico con esito 1
       pred("bruno", "m1", 1, 2),
@@ -101,20 +103,44 @@ describe("bonus unico", () => {
     ]);
     const anna = of(scores, "anna");
     expect(anna.basePoints).toBe(3);
-    expect(anna.uniqueBonus).toBe(1);
-    expect(anna.points).toBe(4);
+    expect(anna.uniqueBonus).toBe(2);
+    expect(anna.points).toBe(5);
   });
 
-  it("non scatta se in due azzeccano l'esito", () => {
+  it("in due si divide: 1 punto di bonus a testa", () => {
+    const scores = scoreMatch(result("m1", 2, 1), [
+      pred("anna", "m1", 2, 1), // esatto
+      pred("bruno", "m1", 3, 0), // solo l'esito
+      pred("carla", "m1", 1, 1),
+      pred("dario", "m1", 0, 2),
+    ]);
+    expect(of(scores, "anna").uniqueBonus).toBe(1);
+    expect(of(scores, "bruno").uniqueBonus).toBe(1);
+    expect(of(scores, "anna").points).toBe(4); // 3 + 1
+    expect(of(scores, "bruno").points).toBe(2); // 1 + 1
+    expect(of(scores, "carla").points).toBe(0);
+  });
+
+  it("in tre non lo prende nessuno: non è più andare controcorrente", () => {
+    const scores = scoreMatch(result("m1", 2, 1), [
+      pred("anna", "m1", 2, 1),
+      pred("bruno", "m1", 3, 0),
+      pred("carla", "m1", 4, 0),
+      pred("dario", "m1", 1, 1),
+    ]);
+    expect(scores.every((s) => s.uniqueBonus === 0)).toBe(true);
+    expect(of(scores, "anna").points).toBe(3);
+    expect(of(scores, "bruno").points).toBe(1);
+  });
+
+  it("il monte bonus non supera mai i 2 punti per partita", () => {
     const scores = scoreMatch(result("m1", 2, 1), [
       pred("anna", "m1", 2, 1),
       pred("bruno", "m1", 3, 0),
       pred("carla", "m1", 1, 1),
     ]);
-    expect(of(scores, "anna").uniqueBonus).toBe(0);
-    expect(of(scores, "bruno").uniqueBonus).toBe(0);
-    expect(of(scores, "anna").points).toBe(3);
-    expect(of(scores, "bruno").points).toBe(1);
+    const totale = scores.reduce((sum, s) => sum + s.uniqueBonus, 0);
+    expect(totale).toBe(2);
   });
 
   it("non scatta se nessuno azzecca l'esito", () => {
@@ -153,8 +179,8 @@ describe("bonus unico", () => {
         pred("bruno", "m1", 1, 1),
         pred("carla", "m1", 0, 1),
       ]);
-      expect(of(scores, "anna").uniqueBonus).toBe(1);
-      expect(of(scores, "anna").points).toBe(2);
+      expect(of(scores, "anna").uniqueBonus).toBe(2);
+      expect(of(scores, "anna").points).toBe(3);
     });
 
     it("conta solo i pronostici su QUELLA partita", () => {
@@ -175,8 +201,8 @@ describe("bonus unico", () => {
         [pred("anna", "m1", 2, 1), pred("bruno", "m1", 1, 1)],
         { uniqueBonusMinPredictions: 2 },
       );
-      expect(of(scores, "anna").uniqueBonus).toBe(1);
-      expect(of(scores, "anna").points).toBe(4);
+      expect(of(scores, "anna").uniqueBonus).toBe(2);
+      expect(of(scores, "anna").points).toBe(5);
     });
   });
 
@@ -234,14 +260,15 @@ describe("scoreMatches", () => {
     expect(scores).toHaveLength(6);
 
     const m1 = scores.filter((s) => s.matchId === "m1");
-    expect(of(m1, "anna").points).toBe(4); // esatto + unico
+    expect(of(m1, "anna").points).toBe(5); // esatto + bonus pieno
     expect(of(m1, "bruno").points).toBe(0);
     expect(of(m1, "carla").points).toBe(0);
 
+    // Sulla m2 la X la azzeccano in due: 1 punto di bonus a testa.
     const m2 = scores.filter((s) => s.matchId === "m2");
-    expect(of(m2, "anna").points).toBe(3); // 0-0 esatto
+    expect(of(m2, "anna").points).toBe(4); // 0-0 esatto + 1
     expect(of(m2, "bruno").points).toBe(0);
-    expect(of(m2, "carla").points).toBe(1); // X giusto, risultato sbagliato
+    expect(of(m2, "carla").points).toBe(2); // X giusta + 1
   });
 
   it("ignora le partite non ancora finite: chi non passa il risultato non prende punti", () => {

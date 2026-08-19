@@ -163,11 +163,11 @@ describe.skipIf(!canRun)("punteggi scritti nel database", () => {
 
     const { error: predictionsError } = await admin.from("predictions").insert([
       // m1 finita 2-1: Anna esatta, Bruno prende l'esito, Carla sbaglia.
-      // In due azzeccano l'1: niente bonus.
+      // L'1 lo azzeccano in due: 1 punto di bonus a testa.
       p(players.anna, matches.m1, 2, 1),
       p(players.bruno, matches.m1, 3, 0),
       p(players.carla, matches.m1, 0, 2),
-      // m2 finita 0-0: solo Bruno azzecca la X, ed è esatta -> 3 + 1 = 4.
+      // m2 finita 0-0: solo Bruno azzecca la X, ed è esatta -> 3 + 2 = 5.
       p(players.anna, matches.m2, 1, 0),
       p(players.bruno, matches.m2, 0, 0),
       p(players.carla, matches.m2, 2, 1),
@@ -211,20 +211,20 @@ describe.skipIf(!canRun)("punteggi scritti nel database", () => {
     const find = (playerId: string, matchId: string) =>
       (data ?? []).find((r) => r.player_id === playerId && r.match_id === matchId)!;
 
-    // m1: risultato esatto, ma in due hanno preso l'esito -> nessun bonus.
+    // m1: l'esito lo prendono in due, quindi i 2 punti si dividono.
     expect(find(players.anna, matches.m1)).toMatchObject({
-      base_points: 3, unique_bonus: 0, points: 3, exact: true,
+      base_points: 3, unique_bonus: 1, points: 4, exact: true,
     });
     expect(find(players.bruno, matches.m1)).toMatchObject({
-      base_points: 1, unique_bonus: 0, points: 1, exact: false,
+      base_points: 1, unique_bonus: 1, points: 2, exact: false,
     });
     expect(find(players.carla, matches.m1)).toMatchObject({
       base_points: 0, unique_bonus: 0, points: 0, outcome_correct: false,
     });
 
-    // m2: unico ad azzeccare la X, e per giunta esatta -> 3 + 1 = 4.
+    // m2: unico ad azzeccare la X, e per giunta esatta -> 3 + 2 = 5.
     expect(find(players.bruno, matches.m2)).toMatchObject({
-      base_points: 3, unique_bonus: 1, points: 4,
+      base_points: 3, unique_bonus: 2, points: 5,
     });
     expect(find(players.anna, matches.m2).points).toBe(0);
     expect(find(players.carla, matches.m2).points).toBe(0);
@@ -241,7 +241,7 @@ describe.skipIf(!canRun)("punteggi scritti nel database", () => {
 
     expect(count).toBe(6);
     const total = (data ?? []).reduce((sum, r) => sum + (r.points as number), 0);
-    expect(total).toBe(8); // Anna 3 + Bruno 1 + Bruno 4
+    expect(total).toBe(11); // Anna 4 + Bruno 2 + Bruno 5
   });
 
   it("aggiunge i punti del recupero senza toccare quelli già assegnati", async () => {
@@ -270,10 +270,9 @@ describe.skipIf(!canRun)("punteggi scritti nel database", () => {
       );
     }
 
-    // m3 finita 1-1: Anna esatta (3), Bruno prende la X (1), Carla niente.
-    // In due azzeccano la X, quindi nessun bonus.
-    expect(totals.get(players.anna)).toBe(6); // 3 + 0 + 3
-    expect(totals.get(players.bruno)).toBe(6); // 1 + 4 + 1
+    // m3 finita 1-1: la X la azzeccano in due, 1 punto di bonus a testa.
+    expect(totals.get(players.anna)).toBe(8); // 4 + 0 + 4
+    expect(totals.get(players.bruno)).toBe(9); // 2 + 5 + 2
     expect(totals.get(players.carla)).toBe(0);
 
     // La giornata ora è completa.
@@ -286,7 +285,7 @@ describe.skipIf(!canRun)("punteggi scritti nel database", () => {
   });
 
   it("costruisce la classifica dalla vista, con gli spareggi giusti", async () => {
-    // Tutte e tre le partite finite: Anna e Bruno arrivano entrambi a 6.
+    // Tutte e tre le partite finite.
     await admin
       .from("matches")
       .update({ status: "FINISHED", home_goals: 1, away_goals: 1 })
@@ -323,11 +322,11 @@ describe.skipIf(!canRun)("punteggi scritti nel database", () => {
       ],
     );
 
-    // Anna e Bruno sono a pari punti (6), ma Bruno ha azzeccato 3 esiti
-    // contro i 2 di Anna: passa avanti lui.
+    // Bruno passa avanti con 9 punti contro gli 8 di Anna: i bonus pieni
+    // presi da solo sulla m2 fanno la differenza.
     expect(standings.map((r) => [r.displayName, r.points, r.outcomeCount])).toEqual([
-      ["Bruno", 6, 3],
-      ["Anna", 6, 2],
+      ["Bruno", 9, 3],
+      ["Anna", 8, 2],
       ["Carla", 0, 0],
     ]);
     expect(standings.map((r) => r.rank)).toEqual([1, 2, 3]);
