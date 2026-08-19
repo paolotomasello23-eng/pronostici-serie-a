@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { computePlayerStats, computeTrophies } from "@/lib/scoring/stats";
+import {
+  computePlayerStats,
+  computeStatLeaderboards,
+  computeTrophies,
+} from "@/lib/scoring/stats";
 import type { ScoreWithMatchday } from "@/lib/scoring/stats";
 import type { PlayerRef } from "@/lib/scoring";
 
@@ -180,5 +184,49 @@ describe("trofei", () => {
 
   it("non assegna niente a lega vuota", () => {
     expect(computeTrophies(computePlayerStats([], PLAYERS))).toEqual([]);
+  });
+});
+
+describe("classifiche per statistica", () => {
+  const stats = computePlayerStats(SCORES, PLAYERS);
+  const boards = computeStatLeaderboards(stats);
+  const board = (key: string) => boards.find((b) => b.key === key)!;
+
+  it("produce una classifica per ogni statistica", () => {
+    expect(boards.length).toBeGreaterThan(5);
+    for (const b of boards) {
+      // Nessuno resta fuori: chi non ha punti compare comunque, in fondo.
+      expect(b.entries).toHaveLength(PLAYERS.length);
+    }
+  });
+
+  it("ordina dal migliore al peggiore", () => {
+    expect(board("punti").entries.map((e) => [e.displayName, e.value])).toEqual([
+      ["Bruno", 6],
+      ["Anna", 4],
+      ["Carla", 3],
+    ]);
+  });
+
+  it("sulle partite a zero mette davanti chi ne ha meno", () => {
+    // Qui il primato è il numero più basso: tutti a 1, quindi tutti primi.
+    const zero = board("zero");
+    expect(zero.entries.every((e) => e.rank === 1)).toBe(true);
+  });
+
+  it("condivide la posizione a pari valore", () => {
+    const esatti = board("esatti");
+    // Anna, Bruno e Carla hanno un risultato esatto a testa.
+    expect(esatti.entries.map((e) => e.rank)).toEqual([1, 1, 1]);
+  });
+
+  it("formatta la precisione come percentuale", () => {
+    expect(board("precisione").entries[0].label).toMatch(/%$/);
+  });
+
+  it("regge una lega senza punteggi", () => {
+    const vuota = computeStatLeaderboards(computePlayerStats([], PLAYERS));
+    expect(vuota.every((b) => b.entries.length === PLAYERS.length)).toBe(true);
+    expect(vuota.every((b) => b.entries.every((e) => e.rank === 1))).toBe(true);
   });
 });

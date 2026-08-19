@@ -226,3 +226,142 @@ export function computeTrophies(stats: readonly PlayerStats[]): Trophy[] {
     })
     .filter((t) => t.winners.length > 0);
 }
+
+/** Una riga di classifica per una singola statistica. */
+export interface StatEntry {
+  playerId: string;
+  displayName: string;
+  /** Il valore grezzo, per ordinare. */
+  value: number;
+  /** Il valore già scritto come va mostrato. */
+  label: string;
+  /** Posizione, condivisa a pari valore (1, 2, 2, 4). */
+  rank: number;
+}
+
+export interface StatLeaderboard {
+  key: string;
+  title: string;
+  description: string;
+  entries: StatEntry[];
+}
+
+interface StatDefinition {
+  key: string;
+  title: string;
+  description: string;
+  pick: (stats: PlayerStats) => number;
+  format: (value: number) => string;
+  /** true quando il primato è il valore più basso, come per le partite a zero. */
+  lowerIsBetter?: boolean;
+}
+
+const STATS: StatDefinition[] = [
+  {
+    key: "punti",
+    title: "Punti totali",
+    description: "La somma di tutto",
+    pick: (s) => s.points,
+    format: (n) => `${n}`,
+  },
+  {
+    key: "competenza",
+    title: "Competenza",
+    description: "Punti presi andando controcorrente",
+    pick: (s) => s.uniqueBonusPoints,
+    format: (n) => `${n}`,
+  },
+  {
+    key: "esiti",
+    title: "Esiti azzeccati",
+    description: "Quante volte hai indovinato chi vinceva",
+    pick: (s) => s.outcomeCount,
+    format: (n) => `${n}`,
+  },
+  {
+    key: "esatti",
+    title: "Risultati esatti",
+    description: "Il punteggio preciso, non solo l'esito",
+    pick: (s) => s.exactCount,
+    format: (n) => `${n}`,
+  },
+  {
+    key: "media",
+    title: "Media a giornata",
+    description: "Punti divisi per le giornate giocate",
+    pick: (s) => s.averagePerMatchday,
+    format: (n) => `${n}`,
+  },
+  {
+    key: "giornateVinte",
+    title: "Giornate vinte",
+    description: "Quante volte hai fatto più punti di tutti",
+    pick: (s) => s.matchdaysWon,
+    format: (n) => `${n}`,
+  },
+  {
+    key: "miglioreGiornata",
+    title: "Miglior giornata",
+    description: "Il record personale in una sola giornata",
+    pick: (s) => s.bestMatchday?.points ?? 0,
+    format: (n) => `${n}`,
+  },
+  {
+    key: "precisione",
+    title: "Precisione",
+    description: "Percentuale di esiti azzeccati",
+    pick: (s) => s.outcomeRate,
+    format: (n) => `${n}%`,
+  },
+  {
+    key: "zero",
+    title: "Partite a zero",
+    description: "Meno ne hai, meglio è",
+    pick: (s) => s.blanks,
+    format: (n) => `${n}`,
+    lowerIsBetter: true,
+  },
+];
+
+/**
+ * Trasforma le statistiche in una classifica per ciascuna di esse.
+ *
+ * Ogni voce è ordinata per conto suo, con le posizioni condivise a pari
+ * valore: in una lega di dieci persone gli ex aequo sono la norma, e
+ * mostrarli come primo e secondo sarebbe semplicemente falso.
+ */
+export function computeStatLeaderboards(
+  stats: readonly PlayerStats[],
+): StatLeaderboard[] {
+  return STATS.map((stat) => {
+    const rows = [...stats]
+      .map((player) => ({
+        playerId: player.playerId,
+        displayName: player.displayName,
+        value: stat.pick(player),
+        label: stat.format(stat.pick(player)),
+        rank: 0,
+      }))
+      .sort(
+        (a, b) =>
+          (stat.lowerIsBetter ? a.value - b.value : b.value - a.value) ||
+          a.displayName.localeCompare(b.displayName, "it", {
+            sensitivity: "base",
+          }),
+      );
+
+    let currentRank = 0;
+    rows.forEach((row, index) => {
+      const previous = rows[index - 1];
+      if (!previous || previous.value !== row.value) currentRank = index + 1;
+      row.rank = currentRank;
+    });
+
+    return {
+      key: stat.key,
+      title: stat.title,
+      description: stat.description,
+      entries: rows,
+    };
+  });
+}

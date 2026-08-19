@@ -3,7 +3,7 @@ import { getSessionWithToken } from "@/lib/auth/session";
 import { userClient } from "@/lib/supabase/server";
 import { computeStandings } from "@/lib/scoring";
 import type { MatchScore, PlayerRef, StandingsRow } from "@/lib/scoring";
-import { Avatar } from "@/components/avatar";
+import { Podium, type PodiumRow } from "@/components/podium";
 
 /**
  * Classifica generale e di giornata.
@@ -108,7 +108,11 @@ export default async function ClassificaPage({
         <>
           <section>
             <h2 className="mb-3 font-semibold">Generale</h2>
-            <Table rows={overall} me={auth.session.playerId} avatarOf={avatarOf} />
+            <Podium
+              rows={toPodium(overall)}
+              me={auth.session.playerId}
+              avatarOf={avatarOf}
+            />
             <p className="mt-2 text-xs text-slate-500">
               A parità di punti conta chi ha azzeccato più esiti, poi più
               risultati esatti.
@@ -135,8 +139,8 @@ export default async function ClassificaPage({
                 ))}
               </div>
 
-              <Table
-                rows={matchdayStandings}
+              <Podium
+                rows={toPodium(matchdayStandings)}
                 me={auth.session.playerId}
                 avatarOf={avatarOf}
               />
@@ -155,45 +159,13 @@ export default async function ClassificaPage({
   );
 }
 
-function Table({
-  rows,
-  me,
-  avatarOf,
-}: {
-  rows: StandingsRow[];
-  me: string;
-  avatarOf: Map<string, string | null>;
-}) {
-  return (
-    <ul className="flex flex-col gap-2">
-      {rows.map((row) => (
-        <li
-          key={row.playerId}
-          className={`flex items-center gap-3 rounded-xl border px-3 py-3 ${
-            row.playerId === me
-              ? "border-slate-900 bg-white"
-              : "border-slate-200 bg-white"
-          }`}
-        >
-          <span className="w-5 shrink-0 text-center font-semibold tabular-nums text-slate-500">
-            {row.rank}
-          </span>
-          <Avatar src={avatarOf.get(row.playerId)} name={row.displayName} size={36} />
-          <span className="min-w-0 flex-1">
-            <span
-              className={`block truncate ${row.playerId === me ? "font-bold" : "font-medium"}`}
-            >
-              {row.displayName}
-            </span>
-            <span className="text-xs text-slate-500">
-              {row.outcomeCount} esiti · {row.exactCount} esatti
-            </span>
-          </span>
-          <span className="shrink-0 text-xl font-bold tabular-nums">
-            {row.points}
-          </span>
-        </li>
-      ))}
-    </ul>
-  );
+/** Dalla classifica al podio: punti in evidenza, spareggi come dettaglio. */
+function toPodium(rows: StandingsRow[]): PodiumRow[] {
+  return rows.map((row) => ({
+    playerId: row.playerId,
+    displayName: row.displayName,
+    label: String(row.points),
+    rank: row.rank,
+    detail: `${row.outcomeCount} esiti · ${row.exactCount} esatti`,
+  }));
 }

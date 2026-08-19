@@ -1,10 +1,10 @@
 import { redirect } from "next/navigation";
 import { getSessionWithToken } from "@/lib/auth/session";
 import { userClient } from "@/lib/supabase/server";
-import { computePlayerStats, computeTrophies } from "@/lib/scoring/stats";
+import { computePlayerStats, computeStatLeaderboards } from "@/lib/scoring/stats";
 import type { ScoreWithMatchday } from "@/lib/scoring/stats";
 import type { PlayerRef } from "@/lib/scoring";
-import { Avatar } from "@/components/avatar";
+import { StatCard } from "./stat-card";
 
 /**
  * Statistiche di lega.
@@ -66,7 +66,7 @@ export default async function StatistichePage() {
   }));
 
   const stats = computePlayerStats(scores, players);
-  const trophies = computeTrophies(stats);
+  const leaderboards = computeStatLeaderboards(stats);
   const matchdays = new Set(scores.map((s) => s.matchdayNumber)).size;
 
   return (
@@ -87,98 +87,17 @@ export default async function StatistichePage() {
           Le statistiche compaiono dopo la prima giornata giocata.
         </p>
       ) : (
-        <>
-          <section>
-            <h2 className="mb-3 font-semibold">Albo d&apos;oro</h2>
-            <ul className="flex flex-col gap-2">
-              {trophies.map((trophy) => (
-                <li
-                  key={trophy.key}
-                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3"
-                >
-                  <div className="flex items-baseline justify-between gap-3">
-                    <span className="font-semibold">{trophy.title}</span>
-                    <span className="shrink-0 text-sm font-medium text-slate-500">
-                      {trophy.value}
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-500">{trophy.description}</p>
-                  <p className="mt-1 font-medium">
-                    {trophy.winners.join(", ")}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          </section>
-
-          <section>
-            <h2 className="mb-3 font-semibold">Numeri di ognuno</h2>
-            <ul className="flex flex-col gap-3">
-              {stats.map((player) => (
-                <li
-                  key={player.playerId}
-                  className={`rounded-2xl border bg-white p-4 ${
-                    player.playerId === auth.session.playerId
-                      ? "border-slate-900"
-                      : "border-slate-200"
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="flex min-w-0 items-center gap-3">
-                      <Avatar
-                        src={avatarOf.get(player.playerId)}
-                        name={player.displayName}
-                        size={40}
-                      />
-                      <span className="truncate font-semibold">
-                        {player.displayName}
-                      </span>
-                    </span>
-                    <span className="shrink-0 text-lg font-bold tabular-nums">
-                      {player.points} pt
-                    </span>
-                  </div>
-
-                  <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-                    <Row label="Partite giocate" value={player.playedMatches} />
-                    <Row label="Giornate" value={player.matchdaysPlayed} />
-                    <Row label="Esiti azzeccati" value={player.outcomeCount} />
-                    <Row label="Precisione" value={`${player.outcomeRate}%`} />
-                    <Row label="Risultati esatti" value={player.exactCount} />
-                    <Row
-                      label="Punti controcorrente"
-                      value={player.uniqueBonusPoints}
-                    />
-                    <Row
-                      label="Media a giornata"
-                      value={player.averagePerMatchday}
-                    />
-                    <Row label="Giornate vinte" value={player.matchdaysWon} />
-                    <Row
-                      label="Miglior giornata"
-                      value={
-                        player.bestMatchday
-                          ? `${player.bestMatchday.points} pt (g${player.bestMatchday.number})`
-                          : "—"
-                      }
-                    />
-                    <Row label="Partite a zero" value={player.blanks} />
-                  </dl>
-                </li>
-              ))}
-            </ul>
-          </section>
-        </>
+        <div className="flex flex-col gap-3">
+          {leaderboards.map((stat) => (
+            <StatCard
+              key={stat.key}
+              stat={stat}
+              me={auth.session.playerId}
+              avatarOf={avatarOf}
+            />
+          ))}
+        </div>
       )}
     </main>
-  );
-}
-
-function Row({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div className="flex items-baseline justify-between gap-2 border-b border-slate-100 pb-1">
-      <dt className="text-slate-500">{label}</dt>
-      <dd className="shrink-0 font-medium tabular-nums">{value}</dd>
-    </div>
   );
 }
