@@ -29,6 +29,10 @@ interface Prediction {
 interface Payload {
   matchday: { id: string; number: number; lock_at: string | null; status: string };
   isLocked: boolean;
+  /** La finestra dei cinque giorni è aperta adesso. */
+  isOpen: boolean;
+  /** Quando si aprirà, se non è ancora il momento. */
+  opensAt: string | null;
   matches: Match[];
   predictions: Prediction[];
   names: Record<string, string>;
@@ -185,7 +189,7 @@ export function PronosticiForm({
         )}
       </header>
 
-      {data.matchday.lock_at && !data.isLocked && (
+      {data.matchday.lock_at && !data.isLocked && data.isOpen && (
         <Countdown
           lockAt={data.matchday.lock_at}
           compiled={compiled}
@@ -197,8 +201,40 @@ export function PronosticiForm({
         <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p>
       )}
 
+      {!data.isLocked && !data.isOpen && data.opensAt && (
+        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-5 text-center">
+          <p className="font-semibold">Non ancora aperta</p>
+          <p className="mt-1 text-sm text-slate-600">
+            I pronostici di questa giornata si aprono{" "}
+            {formatRome(data.opensAt)}.
+          </p>
+        </div>
+      )}
+
       {data.isLocked ? (
         <LockedView data={data} />
+      ) : !data.isOpen ? (
+        <ul className="flex flex-col gap-2">
+          {data.matches.map((m, index) => (
+            <li
+              key={m.id}
+              className={`rounded-2xl border border-slate-200 px-3 py-3 ${
+                index % 2 === 0 ? "bg-slate-100" : "bg-white"
+              }`}
+            >
+              <div className="mb-2 text-center text-xs text-slate-500">
+                <span className="capitalize">{formatRome(m.kickoff_at)}</span>
+              </div>
+              <div className="flex items-center justify-center gap-2 font-medium">
+                <span className="truncate">{teamName(m, "home")}</span>
+                <TeamCrest src={m.home_team_crest} name={teamName(m, "home")} size={20} />
+                <span className="text-slate-400">–</span>
+                <TeamCrest src={m.away_team_crest} name={teamName(m, "away")} size={20} />
+                <span className="truncate">{teamName(m, "away")}</span>
+              </div>
+            </li>
+          ))}
+        </ul>
       ) : (
         <>
           <ul className="flex flex-col gap-2">

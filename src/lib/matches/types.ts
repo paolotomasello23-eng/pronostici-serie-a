@@ -70,3 +70,35 @@ export function computeLockAt(inputs: readonly MatchInput[]): string | null {
     .sort();
   return kickoffs[0] ?? null;
 }
+
+/**
+ * Quanti giorni prima del calcio d'inizio si può cominciare a pronosticare.
+ *
+ * Serve a evitare che qualcuno compili la trentottesima giornata a settembre,
+ * quando gli orari non sono nemmeno stati fissati e le squadre sono un'altra
+ * cosa. La finestra si apre cinque giorni prima della prima partita.
+ */
+export const PREDICTION_WINDOW_DAYS = 5;
+
+/** Da quando si può pronosticare una giornata che si blocca in `lockAt`. */
+export function predictionsOpenAt(lockAt: string): Date {
+  return new Date(
+    new Date(lockAt).getTime() - PREDICTION_WINDOW_DAYS * 86_400_000,
+  );
+}
+
+/**
+ * Se in questo momento la giornata accetta pronostici.
+ *
+ * Tre stati, non due: non ancora aperta, aperta, chiusa. È lo stesso motivo
+ * per cui la schermata deve distinguere "torna fra tre giorni" da "è troppo
+ * tardi" — sono due no che si risolvono in modi opposti.
+ */
+export function arePredictionsOpen(
+  lockAt: string | null,
+  now: Date = new Date(),
+): boolean {
+  if (!lockAt) return false;
+  const lock = new Date(lockAt).getTime();
+  return now.getTime() >= predictionsOpenAt(lockAt).getTime() && now.getTime() < lock;
+}

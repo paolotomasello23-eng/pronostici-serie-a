@@ -4,6 +4,7 @@ import { userClient } from "@/lib/supabase/server";
 import { TeamCrest } from "@/components/team-crest";
 import { Countdown } from "@/components/countdown";
 import { AppMenu } from "@/components/app-menu";
+import { arePredictionsOpen, predictionsOpenAt } from "@/lib/matches/types";
 import { Avatar } from "@/components/avatar";
 
 function formatRome(iso: string): string {
@@ -90,8 +91,9 @@ export default async function Home() {
         .order("kickoff_at")
     : { data: null };
 
-  const isLocked =
-    !!matchday?.lock_at && new Date(matchday.lock_at).getTime() <= Date.now();
+  const lockAt = (matchday?.lock_at as string | null) ?? null;
+  const isLocked = !!lockAt && new Date(lockAt).getTime() <= Date.now();
+  const isOpen = arePredictionsOpen(lockAt);
 
   const { data: avatars } = await supabase
     .from("v_member_avatars")
@@ -139,7 +141,14 @@ export default async function Home() {
             )}
           </div>
 
-          {matchday.lock_at && !isLocked && (
+          {matchday.lock_at && !isLocked && !isOpen && (
+            <p className="mb-4 text-center text-sm text-slate-500">
+              I pronostici si aprono il{" "}
+              {formatRome(predictionsOpenAt(matchday.lock_at as string).toISOString())}
+            </p>
+          )}
+
+          {matchday.lock_at && !isLocked && isOpen && (
             <div className="mb-4">
               <Countdown
                 lockAt={matchday.lock_at as string}
@@ -153,7 +162,11 @@ export default async function Home() {
             href="/pronostici"
             className="mb-4 block rounded-xl bg-slate-900 px-5 py-4 text-center text-lg font-semibold text-white active:bg-slate-700"
           >
-            {isLocked ? "Vedi i pronostici di tutti" : "Fai i tuoi pronostici"}
+            {isLocked
+              ? "Vedi i pronostici di tutti"
+              : isOpen
+                ? "Fai i tuoi pronostici"
+                : "Vedi le partite"}
           </a>
 
           <ul className="flex flex-col gap-2">

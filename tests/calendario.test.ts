@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { computeLockAt, usableGoals } from "@/lib/matches/types";
+import {
+  arePredictionsOpen,
+  computeLockAt,
+  predictionsOpenAt,
+  usableGoals,
+} from "@/lib/matches/types";
 import type { MatchInput, MatchStatus } from "@/lib/matches/types";
 
 const match = (
@@ -111,5 +116,39 @@ describe("usableGoals", () => {
       homeGoals: null,
       awayGoals: null,
     });
+  });
+});
+
+describe("finestra dei cinque giorni", () => {
+  const lock = "2026-08-22T16:30:00Z";
+  const alle = (iso: string) => new Date(iso);
+
+  it("si apre esattamente cinque giorni prima del calcio d'inizio", () => {
+    expect(predictionsOpenAt(lock).toISOString()).toBe("2026-08-17T16:30:00.000Z");
+  });
+
+  it("prima non si può pronosticare", () => {
+    // Un minuto prima dell'apertura.
+    expect(arePredictionsOpen(lock, alle("2026-08-17T16:29:00Z"))).toBe(false);
+  });
+
+  it("nel momento esatto dell'apertura si può", () => {
+    expect(arePredictionsOpen(lock, alle("2026-08-17T16:30:00Z"))).toBe(true);
+  });
+
+  it("durante la finestra si può", () => {
+    expect(arePredictionsOpen(lock, alle("2026-08-20T10:00:00Z"))).toBe(true);
+    expect(arePredictionsOpen(lock, alle("2026-08-22T16:29:00Z"))).toBe(true);
+  });
+
+  it("al calcio d'inizio si chiude", () => {
+    expect(arePredictionsOpen(lock, alle("2026-08-22T16:30:00Z"))).toBe(false);
+    expect(arePredictionsOpen(lock, alle("2026-08-23T12:00:00Z"))).toBe(false);
+  });
+
+  it("una giornata senza orario non accetta pronostici", () => {
+    // Succede quando tutte le partite sono rinviate: senza un momento di
+    // riferimento non c'è né apertura né chiusura.
+    expect(arePredictionsOpen(null, alle("2026-08-20T10:00:00Z"))).toBe(false);
   });
 });

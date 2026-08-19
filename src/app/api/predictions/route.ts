@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getSessionWithToken } from "@/lib/auth/session";
 import { serviceClient, userClient } from "@/lib/supabase/server";
+import { arePredictionsOpen, predictionsOpenAt } from "@/lib/matches/types";
 
 /**
  * Pronostici: lettura e scrittura.
@@ -64,8 +65,10 @@ export async function GET(request: Request) {
         .in("match_id", matchIds)
     : { data: [] };
 
-  const isLocked =
-    !!matchday.lock_at && new Date(matchday.lock_at as string).getTime() <= Date.now();
+  const lockAt = (matchday.lock_at as string | null) ?? null;
+  const isLocked = !!lockAt && new Date(lockAt).getTime() <= Date.now();
+  const isOpen = arePredictionsOpen(lockAt);
+  const opensAt = lockAt ? predictionsOpenAt(lockAt).toISOString() : null;
 
   // I nomi servono solo a giornata bloccata, quando si vedono i pronostici
   // di tutti. Prima del lock non c'è niente da etichettare.
@@ -83,6 +86,8 @@ export async function GET(request: Request) {
   return NextResponse.json({
     matchday,
     isLocked,
+    isOpen,
+    opensAt,
     matches: matches ?? [],
     predictions: predictions ?? [],
     names,
@@ -139,22 +144,44 @@ export async function POST(request: Request) {
   }
 
   const now = Date.now();
-  const locked = (rows ?? []).some((row) => {
+
+  const orariBlocco = (rows ?? []).map((row) => {
     // PostgREST restituisce la relazione come oggetto o come array di uno,
     // a seconda di come deduce la cardinalità: reggiamo entrambe le forme.
     const related = row.matchdays as
       | { lock_at: string | null }
       | { lock_at: string | null }[]
       | null;
-    const lockAt = Array.isArray(related) ? related[0]?.lock_at : related?.lock_at;
-    return !!lockAt && new Date(lockAt).getTime() <= now;
+    return Array.isArray(related) ? related[0]?.lock_at : related?.lock_at;
   });
 
-  if (locked) {
+  if (orariBlocco.some((lockAt) => !!lockAt && new Date(lockAt).getTime() <= now)) {
     return NextResponse.json(
       {
         error:
           "La giornata è bloccata: i pronostici non sono più modificabili.",
+      },
+      { status: 403 },
+    );
+  }
+
+  // Non ancora aperta è un no diverso da "troppo tardi", e va detto così.
+  const nonAncora = orariBlocco.find(
+    (lockAt) => !arePredictionsOpen(lockAt ?? null),
+  );
+  if (nonAncora !== undefined) {
+    const quando = nonAncora
+      ? predictionsOpenAt(nonAncora).toLocaleDateString("it-IT", {
+          timeZone: "Europe/Rome",
+          day: "2-digit",
+          month: "2-digit",
+        })
+      : null;
+    return NextResponse.json(
+      {
+        error: quando
+          ? `Questa giornata si apre il ${quando}.`
+          : "Questa giornata non è ancora aperta.",
       },
       { status: 403 },
     );
