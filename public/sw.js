@@ -27,8 +27,8 @@ self.addEventListener("push", (event) => {
   const title = payload.title || "Pronostici Serie A";
   const options = {
     body: payload.body || "",
-    icon: "/icon.svg",
-    badge: "/icon.svg",
+    icon: "/icon",
+    badge: "/icon",
     // Notifiche con lo stesso tag si sostituiscono: se per qualsiasi motivo
     // ne partissero due, l'utente ne vede comunque una sola.
     tag: payload.tag || "pronostici",
