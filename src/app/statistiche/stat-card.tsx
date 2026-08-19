@@ -46,7 +46,18 @@ export function StatCard({
     rank: e.rank,
   }));
 
-  const primi = stat.entries.filter((e) => e.rank <= 3).slice(0, 3);
+  const tuttiPari =
+    stat.entries.length > 0 &&
+    stat.entries.every((e) => e.value === stat.entries[0].value);
+
+  const primi = stat.entries.slice(0, 3);
+
+  const tinta = (rank: number, chiaro: boolean) => {
+    if (tuttiPari) return chiaro ? "text-slate-300" : "ring-slate-600";
+    if (rank === 1) return chiaro ? "text-amber-400" : "ring-amber-400";
+    if (rank === 2) return chiaro ? "text-slate-300" : "ring-slate-400";
+    return chiaro ? "text-orange-500" : "ring-orange-700";
+  };
 
   return (
     <>
@@ -69,15 +80,7 @@ export function StatCard({
               key={entry.playerId}
               className="flex min-w-0 flex-1 flex-col items-center gap-1 rounded-xl bg-slate-800 px-2 py-2.5"
             >
-              <span
-                className={`block rounded-full ring-2 ${
-                  entry.rank === 1
-                    ? "ring-amber-400"
-                    : entry.rank === 2
-                      ? "ring-slate-400"
-                      : "ring-orange-700"
-                }`}
-              >
+              <span className={`block rounded-full ring-2 ${tinta(entry.rank, false)}`}>
                 <Avatar
                   src={avatarOf.get(entry.playerId)}
                   name={entry.displayName}
@@ -87,15 +90,7 @@ export function StatCard({
               <span className="w-full truncate text-center text-[11px] text-slate-300">
                 {entry.displayName}
               </span>
-              <span
-                className={`text-sm font-bold tabular-nums ${
-                  entry.rank === 1
-                    ? "text-amber-400"
-                    : entry.rank === 2
-                      ? "text-slate-300"
-                      : "text-orange-500"
-                }`}
-              >
+              <span className={`text-sm font-bold tabular-nums ${tinta(entry.rank, true)}`}>
                 {entry.label}
               </span>
             </div>

@@ -99,13 +99,7 @@ export default async function ClassificaPage({
         <h1 className="text-2xl font-bold tracking-tight">Classifica</h1>
       </header>
 
-      {all.length === 0 ? (
-        <p className="rounded-2xl border border-dashed border-slate-300 p-6 text-center text-slate-500">
-          Nessun punteggio ancora calcolato. La classifica compare dopo la
-          prima giornata.
-        </p>
-      ) : (
-        <>
+      <>
           <section>
             <h2 className="mb-3 font-semibold">Generale</h2>
             <Podium
@@ -153,8 +147,7 @@ export default async function ClassificaPage({
               </a>
             </section>
           )}
-        </>
-      )}
+      </>
     </main>
   );
 }

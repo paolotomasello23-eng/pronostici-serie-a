@@ -82,12 +82,7 @@ export default async function StatistichePage() {
         </p>
       </header>
 
-      {scores.length === 0 ? (
-        <p className="rounded-2xl border border-dashed border-slate-300 p-6 text-center text-slate-500">
-          Le statistiche compaiono dopo la prima giornata giocata.
-        </p>
-      ) : (
-        <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-3">
           {leaderboards.map((stat) => (
             <StatCard
               key={stat.key}
@@ -95,9 +90,8 @@ export default async function StatistichePage() {
               me={auth.session.playerId}
               avatarOf={avatarOf}
             />
-          ))}
-        </div>
-      )}
+        ))}
+      </div>
     </main>
   );
 }

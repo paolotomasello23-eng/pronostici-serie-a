@@ -104,11 +104,18 @@ export function Podium({
   me: string;
   avatarOf: Map<string, string | null>;
 }) {
+  // Finché sono tutti allo stesso punto — a inizio campionato, tutti a zero
+  // — non c'è nessun podio da mostrare: metterli tutti sul gradino d'oro con
+  // la corona direbbe una cosa falsa. Si parte con la sola lista, e il podio
+  // compare da solo appena qualcuno stacca gli altri.
+  const tuttiPari =
+    rows.length > 0 && rows.every((r) => r.rank === rows[0].rank);
+
   // I primi tre posti, non le prime tre righe: con gli ex aequo il podio può
   // contenerne quattro, e tagliare al terzo elemento ne lascerebbe fuori uno
   // che sta esattamente allo stesso livello.
-  const podio = rows.filter((r) => r.rank <= 3);
-  const resto = rows.filter((r) => r.rank > 3);
+  const podio = tuttiPari ? [] : rows.filter((r) => r.rank <= 3);
+  const resto = tuttiPari ? rows : rows.filter((r) => r.rank > 3);
 
   // Il primo al centro, come su un podio vero.
   const ordinati = [
