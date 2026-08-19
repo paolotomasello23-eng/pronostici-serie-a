@@ -123,10 +123,9 @@ export default function RegolePage() {
           <StarIcon className="mt-0.5 h-7 w-7 shrink-0 text-amber-500" />
           <div className="min-w-0">
             <p className="text-sm text-slate-700">
-              Cumulabile con i punti base, viene distribuito ai concorrenti che
-              indovinano l&apos;esito (o il risultato esatto) contro la
-              maggioranza della lega, a condizione che almeno 3 partecipanti
-              abbiano inserito un pronostico per la partita in questione.
+              Cumulabile con i punti base, a condizione che almeno 3
+              partecipanti abbiano inserito un pronostico per la partita in
+              questione.
             </p>
             <ul className="mt-2 flex flex-col gap-1 text-sm">
               <li className="flex items-baseline justify-between gap-3">
