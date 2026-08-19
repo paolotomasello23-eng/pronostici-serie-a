@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   arePredictionsOpen,
   computeLockAt,
+  isMatchdayVisible,
   predictionsOpenAt,
   usableGoals,
 } from "@/lib/matches/types";
@@ -150,5 +151,38 @@ describe("finestra dei cinque giorni", () => {
     // Succede quando tutte le partite sono rinviate: senza un momento di
     // riferimento non c'è né apertura né chiusura.
     expect(arePredictionsOpen(null, alle("2026-08-20T10:00:00Z"))).toBe(false);
+  });
+});
+
+describe("finestra di visibilità", () => {
+  const lock = "2026-08-22T16:30:00Z";
+  const alle = (iso: string) => new Date(iso);
+
+  it("compare sette giorni prima del calcio d'inizio", () => {
+    expect(isMatchdayVisible(lock, alle("2026-08-15T16:30:00Z"))).toBe(true);
+  });
+
+  it("prima non compare", () => {
+    expect(isMatchdayVisible(lock, alle("2026-08-15T16:29:00Z"))).toBe(false);
+    expect(isMatchdayVisible(lock, alle("2026-08-01T00:00:00Z"))).toBe(false);
+  });
+
+  it("resta visibile per sempre dopo essere stata giocata", () => {
+    // Lo storico serve proprio a tornare sulle giornate passate.
+    expect(isMatchdayVisible(lock, alle("2026-12-25T00:00:00Z"))).toBe(true);
+  });
+
+  it("è visibile due giorni prima di diventare giocabile", () => {
+    const compare = alle("2026-08-15T16:30:00Z");
+    const gioca = predictionsOpenAt(lock);
+    expect(isMatchdayVisible(lock, compare)).toBe(true);
+    expect(arePredictionsOpen(lock, compare)).toBe(false);
+    expect(
+      (gioca.getTime() - compare.getTime()) / 86_400_000,
+    ).toBe(2);
+  });
+
+  it("una giornata senza orario non compare", () => {
+    expect(isMatchdayVisible(null, alle("2026-08-20T10:00:00Z"))).toBe(false);
   });
 });

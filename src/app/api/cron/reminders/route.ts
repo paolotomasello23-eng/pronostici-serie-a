@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { isAuthorizedCron } from "@/lib/cron/auth";
 import { serviceClient } from "@/lib/supabase/server";
 import { sendToPlayer } from "@/lib/push/send";
+import { predictionsOpenAt } from "@/lib/matches/types";
 
 /**
  * I promemoria prima del blocco.
@@ -78,6 +79,15 @@ const FASI = [
   },
 ] as const;
 
+/**
+ * Per quanto tempo dopo l'apertura ha senso annunciarla.
+ *
+ * Se il controllo non gira per qualche ora — la fascia di silenzio, un
+ * guasto — l'annuncio parte comunque, purché non troppo tardi: "la giornata
+ * è aperta" detto due giorni dopo non è una notizia.
+ */
+const RITARDO_MAX_APERTURA_ORE = 12;
+
 /** L'ora attuale in Italia, per sapere se siamo nella fascia di silenzio. */
 function oraItaliana(now: Date): number {
   return Number(
@@ -115,6 +125,47 @@ export async function POST(request: Request) {
       });
     }
 
+    // ---- Annuncio di apertura ----
+    // Le giornate la cui finestra si è aperta da poco: si guarda molto più
+    // avanti degli otto ore dei promemoria, perché l'apertura cade cinque
+    // giorni prima del blocco.
+    const { data: aperte } = await admin
+      .from("matchdays")
+      .select("id, number, lock_at")
+      .gt("lock_at", now.toISOString())
+      .lte("lock_at", new Date(now.getTime() + 6 * 86_400_000).toISOString());
+
+    let annunci = 0;
+
+    for (const giornata of aperte ?? []) {
+      const apertura = predictionsOpenAt(giornata.lock_at as string).getTime();
+      const daQuando = (now.getTime() - apertura) / 3_600_000;
+
+      if (daQuando < 0 || daQuando > RITARDO_MAX_APERTURA_ORE) continue;
+
+      const { data: membri } = await admin
+        .from("league_members")
+        .select("player_id");
+
+      for (const membro of membri ?? []) {
+        const { error: giaFatto } = await admin.from("push_reminders").insert({
+          matchday_id: giornata.id as string,
+          player_id: membro.player_id as string,
+          kind: "apertura",
+        });
+        if (giaFatto) continue;
+
+        const esito = await sendToPlayer(admin, membro.player_id as string, {
+          title: `Giornata ${giornata.number} aperta`,
+          body: "Puoi mettere i tuoi pronostici",
+          url: `/pronostici?giornata=${giornata.number}`,
+          tag: `apertura-${giornata.id}`,
+        });
+        if (esito.sent > 0) annunci++;
+      }
+    }
+
+    // ---- Promemoria prima del blocco ----
     const massimo = new Date(now.getTime() + 8 * 3_600_000);
 
     const { data: matchdays } = await admin
@@ -124,7 +175,11 @@ export async function POST(request: Request) {
       .lte("lock_at", massimo.toISOString());
 
     if (!matchdays || matchdays.length === 0) {
-      return NextResponse.json({ ok: true, message: "Nessun blocco in vista." });
+      return NextResponse.json({
+        ok: true,
+        annunci,
+        message: "Nessun blocco in vista.",
+      });
     }
 
     const report: Array<{ matchday: number; fase: string; inviate: number }> = [];
@@ -200,7 +255,7 @@ export async function POST(request: Request) {
       });
     }
 
-    return NextResponse.json({ ok: true, fasi: report });
+    return NextResponse.json({ ok: true, annunci, fasi: report });
   } catch (error) {
     console.error("[cron/reminders] fallito:", error);
     return NextResponse.json(

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getSessionWithToken } from "@/lib/auth/session";
 import { userClient } from "@/lib/supabase/server";
 import { PronosticiForm } from "./form";
+import { isMatchdayVisible } from "@/lib/matches/types";
 
 /**
  * Sceglie la giornata da mostrare e lascia il resto al componente client.
@@ -44,7 +45,10 @@ export default async function PronosticiPage({
       id: g.id as string,
       number: g.number as number,
       lockAt: g.lock_at as string | null,
-    }));
+    }))
+    // Le giornate troppo lontane non compaiono ancora: niente da fare, e
+    // il selettore resterebbe pieno di numeri inerti.
+    .filter((g) => isMatchdayVisible(g.lockAt));
 
   if (disponibili.length === 0) {
     return (

@@ -4,7 +4,11 @@ import { userClient } from "@/lib/supabase/server";
 import { TeamCrest } from "@/components/team-crest";
 import { Countdown } from "@/components/countdown";
 import { AppMenu } from "@/components/app-menu";
-import { arePredictionsOpen, predictionsOpenAt } from "@/lib/matches/types";
+import {
+  arePredictionsOpen,
+  isMatchdayVisible,
+  predictionsOpenAt,
+} from "@/lib/matches/types";
 import { Avatar } from "@/components/avatar";
 
 function formatRome(iso: string): string {
@@ -79,7 +83,23 @@ export default async function Home() {
         .limit(1)
         .maybeSingle();
 
-  const matchday = upcoming ?? latest;
+  // Se la prossima giornata non è ancora visibile si resta sull'ultima
+  // conosciuta: annunciare una giornata che l'app non mostra ancora sarebbe
+  // solo un rimando a vuoto.
+  const prossima = upcoming ?? latest;
+  const matchday =
+    prossima && isMatchdayVisible((prossima.lock_at as string | null) ?? null)
+      ? prossima
+      : ((
+          await supabase
+            .from("matchdays")
+            .select("id, number, lock_at, status")
+            .eq("season", league.season)
+            .lte("lock_at", nowIso)
+            .order("lock_at", { ascending: false })
+            .limit(1)
+            .maybeSingle()
+        ).data ?? prossima);
 
   const { data: matches } = matchday
     ? await supabase

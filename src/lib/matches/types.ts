@@ -80,6 +80,32 @@ export function computeLockAt(inputs: readonly MatchInput[]): string | null {
  */
 export const PREDICTION_WINDOW_DAYS = 5;
 
+/**
+ * Quanti giorni prima la giornata compare in app.
+ *
+ * Due giorni di anticipo sulla finestra dei pronostici: si vedono gli
+ * accoppiamenti e gli orari, e si sa quando si potrà giocare. Mostrarle
+ * tutte e trentotto da subito riempirebbe il selettore di giornate su cui
+ * non c'è niente da fare.
+ */
+export const VISIBILITY_WINDOW_DAYS = 7;
+
+/**
+ * Se la giornata va mostrata.
+ *
+ * Le giornate passate restano sempre visibili: lo storico serve proprio a
+ * tornarci sopra.
+ */
+export function isMatchdayVisible(
+  lockAt: string | null,
+  now: Date = new Date(),
+): boolean {
+  if (!lockAt) return false;
+  const compare =
+    new Date(lockAt).getTime() - VISIBILITY_WINDOW_DAYS * 86_400_000;
+  return now.getTime() >= compare;
+}
+
 /** Da quando si può pronosticare una giornata che si blocca in `lockAt`. */
 export function predictionsOpenAt(lockAt: string): Date {
   return new Date(
