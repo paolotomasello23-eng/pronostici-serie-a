@@ -24,6 +24,23 @@ const canRun = Boolean(URL_ && SERVICE_KEY && ANON_KEY && JWT_SECRET);
 
 const TEST_SEASON = 1900;
 
+/**
+ * I giocatori creati da questo file portano questo prefisso nel nome utente,
+ * e la pulizia li cerca da lì. Passare dalla lega non basta: se il setup
+ * fallisce dopo aver creato i giocatori ma prima di iscriverli, quelli
+ * restano orfani e nessuno li ritrova più — in due giorni se n'erano
+ * accumulati diciotto.
+ *
+ * Il prefisso è diverso in ogni file di test apposta: Vitest esegue i file
+ * in parallelo sullo stesso database, e con un prefisso condiviso la
+ * pulizia di uno cancellerebbe i giocatori dell'altro mentre sta lavorando.
+ *
+ * Niente underscore: in una clausola LIKE è un carattere jolly, e
+ * "__test%" cancellerebbe molto più del previsto.
+ */
+const TEST_PREFIX = "zztest-rls-";
+
+
 async function tokenFor(playerId: string, leagueId: string): Promise<string> {
   return new SignJWT({ role: "authenticated", league_id: leagueId })
     .setProtectedHeader({ alg: "HS256", typ: "JWT" })
@@ -65,7 +82,10 @@ describe.skipIf(!canRun)("policy RLS sui pronostici", () => {
 
     const { data: players, error: playersError } = await admin
       .from("players")
-      .insert([{ pin_hash: "test" }, { pin_hash: "test" }])
+      .insert([
+        { pin_hash: "test", username: `${TEST_PREFIX}${Date.now()}-a` },
+        { pin_hash: "test", username: `${TEST_PREFIX}${Date.now()}-b` },
+      ])
       .select("id");
     if (playersError) throw playersError;
     playerA = players[0].id;
@@ -327,4 +347,8 @@ async function cleanup(admin: SupabaseClient): Promise<void> {
   if (dayIds.length) {
     await admin.from("matchdays").delete().in("id", dayIds);
   }
+
+  // Rete di sicurezza: qualunque giocatore di prova rimasto per strada,
+  // anche di esecuzioni precedenti andate male.
+  await admin.from("players").delete().like("username", `${TEST_PREFIX}%`);
 }

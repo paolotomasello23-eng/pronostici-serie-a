@@ -38,6 +38,23 @@ async function clientFor(playerId: string, leagueId: string) {
 
 const TEST_SEASON = 1901;
 
+/**
+ * I giocatori creati da questo file portano questo prefisso nel nome utente,
+ * e la pulizia li cerca da lì. Passare dalla lega non basta: se il setup
+ * fallisce dopo aver creato i giocatori ma prima di iscriverli, quelli
+ * restano orfani e nessuno li ritrova più — in due giorni se n'erano
+ * accumulati diciotto.
+ *
+ * Il prefisso è diverso in ogni file di test apposta: Vitest esegue i file
+ * in parallelo sullo stesso database, e con un prefisso condiviso la
+ * pulizia di uno cancellerebbe i giocatori dell'altro mentre sta lavorando.
+ *
+ * Niente underscore: in una clausola LIKE è un carattere jolly, e
+ * "__test%" cancellerebbe molto più del previsto.
+ */
+const TEST_PREFIX = "zztest-sco-";
+
+
 describe.skipIf(!canRun)("punteggi scritti nel database", () => {
   let admin: SupabaseClient;
   let leagueId: string;
@@ -78,9 +95,14 @@ describe.skipIf(!canRun)("punteggi scritti nel database", () => {
     if (leagueError) throw leagueError;
     leagueId = league.id;
 
+    const stamp = Date.now();
     const { data: created, error: playersError } = await admin
       .from("players")
-      .insert([{ pin_hash: "t" }, { pin_hash: "t" }, { pin_hash: "t" }])
+      .insert([
+        { pin_hash: "t", username: `${TEST_PREFIX}${stamp}-anna` },
+        { pin_hash: "t", username: `${TEST_PREFIX}${stamp}-bruno` },
+        { pin_hash: "t", username: `${TEST_PREFIX}${stamp}-carla` },
+      ])
       .select("id");
     if (playersError) throw playersError;
     players = {
@@ -316,7 +338,7 @@ describe.skipIf(!canRun)("punteggi scritti nel database", () => {
     // creata e diventare una scorciatoia per leggere dati altrui.
     const { data: outsider } = await admin
       .from("players")
-      .insert({ pin_hash: "t" })
+      .insert({ pin_hash: "t", username: `${TEST_PREFIX}${Date.now()}-estraneo` })
       .select("id")
       .single();
 
@@ -394,4 +416,7 @@ async function cleanup(admin: SupabaseClient): Promise<void> {
   }
 
   if (dayIds.length) await admin.from("matchdays").delete().in("id", dayIds);
+
+  // Rete di sicurezza, come sopra.
+  await admin.from("players").delete().like("username", `${TEST_PREFIX}%`);
 }
