@@ -158,7 +158,6 @@ function toPodium(rows: StandingsRow[]): PodiumRow[] {
     playerId: row.playerId,
     displayName: row.displayName,
     label: String(row.points),
-    rank: row.rank,
     detail: `${row.outcomeCount} esiti · ${row.exactCount} esatti`,
   }));
 }

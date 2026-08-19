@@ -43,19 +43,13 @@ export function StatCard({
     playerId: e.playerId,
     displayName: e.displayName,
     label: e.label,
-    rank: e.rank,
   }));
-
-  const tuttiPari =
-    stat.entries.length > 0 &&
-    stat.entries.every((e) => e.value === stat.entries[0].value);
 
   const primi = stat.entries.slice(0, 3);
 
-  const tinta = (rank: number, chiaro: boolean) => {
-    if (tuttiPari) return chiaro ? "text-slate-300" : "ring-slate-600";
-    if (rank === 1) return chiaro ? "text-amber-400" : "ring-amber-400";
-    if (rank === 2) return chiaro ? "text-slate-300" : "ring-slate-400";
+  const tinta = (position: number, chiaro: boolean) => {
+    if (position === 1) return chiaro ? "text-amber-400" : "ring-amber-400";
+    if (position === 2) return chiaro ? "text-slate-300" : "ring-slate-400";
     return chiaro ? "text-orange-500" : "ring-orange-700";
   };
 
@@ -75,12 +69,12 @@ export function StatCard({
         <p className="mt-0.5 text-xs text-slate-400">{stat.description}</p>
 
         <div className="mt-3 flex gap-2">
-          {primi.map((entry) => (
+          {primi.map((entry, index) => (
             <div
               key={entry.playerId}
               className="flex min-w-0 flex-1 flex-col items-center gap-1 rounded-xl bg-slate-800 px-2 py-2.5"
             >
-              <span className={`block rounded-full ring-2 ${tinta(entry.rank, false)}`}>
+              <span className={`block rounded-full ring-2 ${tinta(index + 1, false)}`}>
                 <Avatar
                   src={avatarOf.get(entry.playerId)}
                   name={entry.displayName}
@@ -90,7 +84,7 @@ export function StatCard({
               <span className="w-full truncate text-center text-[11px] text-slate-300">
                 {entry.displayName}
               </span>
-              <span className={`text-sm font-bold tabular-nums ${tinta(entry.rank, true)}`}>
+              <span className={`text-sm font-bold tabular-nums ${tinta(index + 1, true)}`}>
                 {entry.label}
               </span>
             </div>

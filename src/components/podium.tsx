@@ -13,7 +13,6 @@ export interface PodiumRow {
   displayName: string;
   /** Il valore già formattato: punti, percentuale, quello che è. */
   label: string;
-  rank: number;
   /** Riga secondaria opzionale, sotto il nome. */
   detail?: string;
 }
@@ -48,14 +47,16 @@ function Crown() {
 
 function Step({
   row,
+  position,
   avatarUrl,
   isMe,
 }: {
   row: PodiumRow;
+  position: 1 | 2 | 3;
   avatarUrl?: string | null;
   isMe: boolean;
 }) {
-  const medal = MEDALS[Math.min(row.rank, 3) as 1 | 2 | 3];
+  const medal = MEDALS[position];
 
   return (
     <div className="flex min-w-0 flex-1 flex-col items-center">
@@ -67,14 +68,14 @@ function Step({
         </span>
         <span
           className={`absolute -bottom-1 left-1/2 flex h-6 w-6 -translate-x-1/2 items-center justify-center rounded-full border-2 border-white text-xs font-bold text-white ${
-            row.rank === 1
+            position === 1
               ? "bg-amber-400"
-              : row.rank === 2
+              : position === 2
                 ? "bg-slate-400"
                 : "bg-orange-700"
           }`}
         >
-          {row.rank}
+          {position}
         </span>
       </div>
 
@@ -104,35 +105,30 @@ export function Podium({
   me: string;
   avatarOf: Map<string, string | null>;
 }) {
-  // Finché sono tutti allo stesso punto — a inizio campionato, tutti a zero
-  // — non c'è nessun podio da mostrare: metterli tutti sul gradino d'oro con
-  // la corona direbbe una cosa falsa. Si parte con la sola lista, e il podio
-  // compare da solo appena qualcuno stacca gli altri.
-  const tuttiPari =
-    rows.length > 0 && rows.every((r) => r.rank === rows[0].rank);
+  // La posizione viene dall'ordine della lista, non da un pari merito
+  // calcolato: i gradini del podio sono tre, e a inizio campionato — tutti a
+  // zero — servono comunque tre nomi da metterci sopra. Chi arriva davvero
+  // primo lo decidono i punti e gli spareggi, che hanno già ordinato queste
+  // righe prima di arrivare qui.
+  const podio = rows.slice(0, 3);
+  const resto = rows.slice(3);
 
-  // I primi tre posti, non le prime tre righe: con gli ex aequo il podio può
-  // contenerne quattro, e tagliare al terzo elemento ne lascerebbe fuori uno
-  // che sta esattamente allo stesso livello.
-  const podio = tuttiPari ? [] : rows.filter((r) => r.rank <= 3);
-  const resto = tuttiPari ? rows : rows.filter((r) => r.rank > 3);
-
-  // Il primo al centro, come su un podio vero.
-  const ordinati = [
-    podio.find((r) => r.rank === 2),
-    podio.find((r) => r.rank === 1),
-    ...podio.filter((r) => r.rank === 3),
-    ...podio.filter((r) => r.rank === 2).slice(1),
-  ].filter((r): r is PodiumRow => Boolean(r));
+  // Il primo al centro, come su un podio vero: secondo, primo, terzo.
+  const ordinati: Array<{ row: PodiumRow; position: 1 | 2 | 3 }> = [
+    podio[1] && { row: podio[1], position: 2 as const },
+    podio[0] && { row: podio[0], position: 1 as const },
+    podio[2] && { row: podio[2], position: 3 as const },
+  ].filter((x): x is { row: PodiumRow; position: 1 | 2 | 3 } => Boolean(x));
 
   return (
     <div className="flex flex-col gap-4">
       {ordinati.length > 0 && (
         <div className="flex items-end justify-center gap-2 rounded-2xl bg-slate-100 px-2 py-4">
-          {ordinati.map((row) => (
+          {ordinati.map(({ row, position }) => (
             <Step
               key={row.playerId}
               row={row}
+              position={position}
               avatarUrl={avatarOf.get(row.playerId)}
               isMe={row.playerId === me}
             />
@@ -142,7 +138,7 @@ export function Podium({
 
       {resto.length > 0 && (
         <ul className="flex flex-col gap-2">
-          {resto.map((row) => (
+          {resto.map((row, index) => (
             <li
               key={row.playerId}
               className={`flex items-center gap-3 rounded-xl border bg-white px-3 py-2.5 ${
@@ -150,7 +146,7 @@ export function Podium({
               }`}
             >
               <span className="w-5 shrink-0 text-center text-sm font-semibold tabular-nums text-slate-400">
-                {row.rank}
+                {index + 4}
               </span>
               <span className="block rounded-full ring-2 ring-slate-900">
                 <Avatar
