@@ -4,44 +4,98 @@ import { serviceClient } from "@/lib/supabase/server";
 import { sendToPlayer } from "@/lib/push/send";
 
 /**
- * Le tre chiamate prima del blocco.
+ * I promemoria prima del blocco.
  *
- * Le finestre non si sovrappongono e ogni fase parte una volta sola per
- * giornata e per persona: la riga in `push_reminders` viene scritta prima
- * dell'invio, quindi un cron che gira ogni dieci minuti non produce dieci
- * notifiche uguali.
+ * Tre chiamate, pensate su un principio solo: una notifica deve dire a chi
+ * la riceve qualcosa che lo riguarda. Le prime due partono soltanto per chi
+ * ha ancora partite in bianco e portano il suo nome e il suo numero; l'ultima
+ * va a tutti, ma cambia testo a seconda che tu abbia finito o no.
  *
- * Ordine dalla più lontana alla più vicina al fischio d'inizio.
+ * Il motivo non è cortesia: chi riceve avvisi che non lo riguardano
+ * disattiva le notifiche, e poi non riceve nemmeno quella che gli serviva.
  */
+
+/**
+ * Fascia di silenzio, in ore italiane.
+ *
+ * Una giornata che comincia alle 12:30 avrebbe la prima chiamata alle 4:30
+ * del mattino. Chi dorme non compila pronostici, e chi viene svegliato da
+ * un'app la disinstalla: in quella fascia non parte niente, e le finestre
+ * qui sotto fanno sì che l'avviso parta comunque appena il silenzio finisce.
+ */
+const SILENZIO_DA = 23;
+const SILENZIO_A = 8;
+
+interface Contesto {
+  nome: string;
+  mancanti: number;
+  giornata: number;
+  /** Ora del blocco, già scritta all'italiana: "18:30". */
+  oraBlocco: string;
+  oreMancanti: number;
+}
+
 const FASI = [
   {
     kind: "8h",
-    /** Vale quando mancano fra 4 e 8 ore. */
-    da: 4,
+    /** Otto ore prima, o appena finisce il silenzio notturno. */
+    da: 2.5,
     a: 8,
-    /** A tutti, anche a chi ha già finito. */
-    soloIncompleti: false,
-    titolo: () => "8 ore al calcio d'inizio",
-    testo: () => "Dai un'occhiata ai tuoi pronostici",
+    soloIncompleti: true,
+    messaggio: (c: Contesto) => ({
+      title:
+        c.mancanti === 1
+          ? `${c.nome}, manca un pronostico`
+          : `${c.nome}, mancano ${c.mancanti} pronostici`,
+      body: `La giornata ${c.giornata} si chiude alle ${c.oraBlocco}`,
+    }),
   },
   {
-    kind: "4h",
-    da: 0.5,
-    a: 4,
+    kind: "2h",
+    da: 0.6,
+    a: 2.5,
     soloIncompleti: true,
-    titolo: (nome: string) => `Svegliaaa ${nome}!!!!`,
-    testo: (_nome: string, mancanti: number) =>
-      `Devi ancora completare ${mancanti} pronostic${mancanti === 1 ? "o" : "i"}!`,
+    messaggio: (c: Contesto) => ({
+      title: `Svegliaaa ${c.nome}!!!`,
+      body:
+        c.mancanti === 1
+          ? "Ti manca un solo pronostico, si chiude fra un paio d'ore"
+          : `Hai ancora ${c.mancanti} partite da compilare, si chiude fra un paio d'ore`,
+    }),
   },
   {
     kind: "30m",
     da: 0,
-    a: 0.5,
+    a: 0.6,
     soloIncompleti: false,
-    titolo: () => "Manca poco ormai",
-    testo: () => "Avrai messo le scelte giuste??",
+    messaggio: (c: Contesto) => ({
+      title: c.mancanti > 0 ? `Ultimi minuti, ${c.nome}!` : "Ci siamo",
+      body:
+        c.mancanti > 0
+          ? `${c.mancanti} partite in bianco valgono zero`
+          : "Avrai messo le scelte giuste?? Fra poco si chiude",
+    }),
   },
 ] as const;
+
+/** L'ora attuale in Italia, per sapere se siamo nella fascia di silenzio. */
+function oraItaliana(now: Date): number {
+  return Number(
+    new Intl.DateTimeFormat("it-IT", {
+      timeZone: "Europe/Rome",
+      hour: "2-digit",
+      hour12: false,
+    }).format(now),
+  );
+}
+
+function formattaOra(iso: string): string {
+  return new Date(iso).toLocaleTimeString("it-IT", {
+    timeZone: "Europe/Rome",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
 
 export async function POST(request: Request) {
   if (!isAuthorizedCron(request)) {
@@ -52,6 +106,15 @@ export async function POST(request: Request) {
 
   try {
     const now = new Date();
+    const ora = oraItaliana(now);
+
+    if (ora >= SILENZIO_DA || ora < SILENZIO_A) {
+      return NextResponse.json({
+        ok: true,
+        message: `Fascia di silenzio (${ora}:00 in Italia): nessun invio.`,
+      });
+    }
+
     const massimo = new Date(now.getTime() + 8 * 3_600_000);
 
     const { data: matchdays } = await admin
@@ -100,7 +163,6 @@ export async function POST(request: Request) {
 
       for (const member of members ?? []) {
         const playerId = member.player_id as string;
-        const nome = member.display_name as string;
         const mancanti = matchIds.length - (compilati.get(playerId) ?? 0);
 
         if (fase.soloIncompleti && mancanti <= 0) continue;
@@ -117,8 +179,13 @@ export async function POST(request: Request) {
         if (giaInviata) continue;
 
         const esito = await sendToPlayer(admin, playerId, {
-          title: fase.titolo(nome),
-          body: fase.testo(nome, mancanti),
+          ...fase.messaggio({
+            nome: member.display_name as string,
+            mancanti,
+            giornata: matchday.number as number,
+            oraBlocco: formattaOra(matchday.lock_at as string),
+            oreMancanti,
+          }),
           url: "/pronostici",
           tag: `${fase.kind}-${matchday.id}`,
         });
