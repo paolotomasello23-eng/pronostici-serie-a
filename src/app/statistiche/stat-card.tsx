@@ -62,12 +62,7 @@ export function StatCard({
         aria-expanded={open}
         className="w-full rounded-2xl bg-slate-900 p-4 text-left text-white active:bg-slate-800"
       >
-        <div className="flex items-baseline justify-between gap-3">
-          <span className="font-semibold">{stat.title}</span>
-          <span aria-hidden className="shrink-0 text-sm text-slate-400">
-            vedi tutti ›
-          </span>
-        </div>
+        <span className="font-semibold">{stat.title}</span>
         <p className="mt-0.5 text-xs text-slate-400">{stat.description}</p>
 
         <div className="mt-3 flex gap-2">
