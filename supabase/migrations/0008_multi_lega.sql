@@ -52,6 +52,11 @@ create unique index if not exists players_username_key
 -- ============================================================
 -- Registrazione: crea la persona e la mette nella sua prima lega.
 -- ============================================================
+-- Le colonne sono sempre qualificate con l'alias della tabella: i nomi
+-- dichiarati nel `returns table` diventano variabili dentro la funzione, e
+-- un `where username = ...` non scritto per esteso lascia a Postgres il
+-- dubbio se intendiamo la colonna o il valore da restituire. Il dubbio non
+-- se lo tiene: interrompe tutto.
 create or replace function register_with_league(
   p_invite_code text,
   p_username    text,
@@ -63,14 +68,16 @@ declare
   v_player_id uuid;
   v_members   int;
 begin
-  select id into v_league_id from leagues
-   where upper(invite_code) = upper(trim(p_invite_code));
+  select l.id into v_league_id from leagues l
+   where upper(l.invite_code) = upper(trim(p_invite_code));
 
   if v_league_id is null then
     raise exception 'INVITE_CODE_NOT_FOUND';
   end if;
 
-  if exists (select 1 from players where lower(username) = lower(trim(p_username))) then
+  if exists (
+    select 1 from players pl where lower(pl.username) = lower(trim(p_username))
+  ) then
     raise exception 'USERNAME_TAKEN';
   end if;
 
@@ -103,26 +110,27 @@ declare
   v_username  text;
   v_members   int;
 begin
-  select id, name into v_league_id, v_name from leagues
-   where upper(invite_code) = upper(trim(p_invite_code));
+  select l.id, l.name into v_league_id, v_name from leagues l
+   where upper(l.invite_code) = upper(trim(p_invite_code));
 
   if v_league_id is null then
     raise exception 'INVITE_CODE_NOT_FOUND';
   end if;
 
   if exists (
-    select 1 from league_members
-     where league_id = v_league_id and player_id = p_player_id
+    select 1 from league_members lm
+     where lm.league_id = v_league_id and lm.player_id = p_player_id
   ) then
     raise exception 'ALREADY_MEMBER';
   end if;
 
-  select count(*) into v_members from league_members where league_id = v_league_id;
+  select count(*) into v_members from league_members lm
+   where lm.league_id = v_league_id;
   if v_members >= 10 then
     raise exception 'LEAGUE_FULL';
   end if;
 
-  select username into v_username from players where id = p_player_id;
+  select pl.username into v_username from players pl where pl.id = p_player_id;
   if v_username is null then
     raise exception 'PLAYER_NOT_FOUND';
   end if;
@@ -131,8 +139,9 @@ begin
   -- occupato da qualcun altro si aggiunge un suffisso: meglio "Marco-2" che
   -- un ingresso rifiutato per un omonimo che nemmeno conosci.
   if exists (
-    select 1 from league_members
-     where league_id = v_league_id and lower(display_name) = lower(v_username)
+    select 1 from league_members lm
+     where lm.league_id = v_league_id
+       and lower(lm.display_name) = lower(v_username)
   ) then
     v_username := v_username || '-' || substr(p_player_id::text, 1, 2);
   end if;
@@ -164,7 +173,9 @@ begin
     raise exception 'LEAGUE_ALREADY_EXISTS';
   end if;
 
-  if exists (select 1 from players where lower(username) = lower(trim(p_display_name))) then
+  if exists (
+    select 1 from players pl where lower(pl.username) = lower(trim(p_display_name))
+  ) then
     raise exception 'USERNAME_TAKEN';
   end if;
 
