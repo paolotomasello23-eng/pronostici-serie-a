@@ -135,7 +135,6 @@ export function PronosticiForm({ matchdayId }: { matchdayId: string }) {
   if (error && !data) {
     return (
       <main className="mx-auto max-w-md p-6">
-        <a href="/" className="text-sm text-slate-500 underline">← Torna alla lega</a>
         <p className="mt-6 rounded-xl bg-red-50 px-4 py-3 text-red-800">{error}</p>
       </main>
     );
@@ -150,24 +149,13 @@ export function PronosticiForm({ matchdayId }: { matchdayId: string }) {
   ).length;
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-4 p-4 pb-28">
-      <header className="pt-4">
-        <a href="/" className="text-sm text-slate-500 underline">← Torna alla lega</a>
-        <div className="mt-2 flex items-baseline justify-between">
-          <h1 className="text-2xl font-bold tracking-tight">
-            Giornata {data.matchday.number}
-          </h1>
-          <span
-            className={`text-sm font-medium ${data.isLocked ? "text-amber-700" : "text-emerald-700"}`}
-          >
-            {data.isLocked ? "Bloccata" : "Aperta"}
-          </span>
-        </div>
-        {data.matchday.lock_at && (
-          <p className="mt-1 text-sm text-slate-500">
-            {data.isLocked ? "Bloccata dal" : "Si blocca il"}{" "}
-            {formatRome(data.matchday.lock_at)}
-          </p>
+    <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-4 p-4 pb-6">
+      <header className="pt-4 text-center">
+        <h1 className="text-2xl font-bold tracking-tight">
+          Giornata {data.matchday.number}
+        </h1>
+        {data.isLocked && (
+          <p className="mt-1 text-sm font-medium text-amber-700">Bloccata</p>
         )}
       </header>
 
@@ -187,24 +175,21 @@ export function PronosticiForm({ matchdayId }: { matchdayId: string }) {
         <LockedView data={data} />
       ) : (
         <>
-          <p className="text-sm text-slate-500">
-            Scrivi il risultato esatto. Si salva da solo, e puoi cambiarlo fino
-            al calcio d&apos;inizio della prima partita.
-          </p>
-
           <ul className="flex flex-col gap-2">
-            {data.matches.map((m) => {
+            {data.matches.map((m, index) => {
               const value = draft[m.id] ?? { home: "", away: "" };
-              const done = value.home !== "" && value.away !== "";
               return (
                 <li
                   key={m.id}
-                  className={`rounded-2xl border bg-white px-3 py-3 ${done ? "border-slate-200" : "border-slate-300 bg-slate-50"}`}
+                  // Righe a tono alternato, come nella schermata principale.
+                  className={`rounded-2xl border border-slate-200 px-3 py-3 ${
+                    index % 2 === 0 ? "bg-slate-100" : "bg-white"
+                  }`}
                 >
-                  <div className="mb-2 flex items-center justify-between text-xs text-slate-500">
-                    <span>{formatRome(m.kickoff_at)}</span>
+                  <div className="mb-2 text-center text-xs text-slate-500">
+                    <span className="capitalize">{formatRome(m.kickoff_at)}</span>
                     {["POSTPONED", "SUSPENDED", "CANCELLED"].includes(m.status) && (
-                      <span className="font-medium text-amber-700">
+                      <span className="ml-2 font-medium text-amber-700">
                         {m.status === "POSTPONED" ? "Rinviata" : m.status === "SUSPENDED" ? "Sospesa" : "Annullata"}
                       </span>
                     )}
@@ -252,18 +237,15 @@ export function PronosticiForm({ matchdayId }: { matchdayId: string }) {
           </ul>
 
           {/* Sopra la barra di navigazione, che occupa gli ultimi 80px. */}
-          <div className="fixed inset-x-0 bottom-20 z-10 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur">
-            <div className="mx-auto flex max-w-md items-center justify-between">
-              <span className="text-sm text-slate-600">
-                {compiled} di {data.matches.length} compilati
-              </span>
-              <span className="text-sm font-medium">
-                {saveState === "saving" && <span className="text-slate-500">Salvo…</span>}
-                {saveState === "saved" && <span className="text-emerald-700">Salvato</span>}
-                {saveState === "error" && <span className="text-red-700">Non salvato</span>}
-              </span>
-            </div>
-          </div>
+          {/* Solo lo stato del salvataggio: il conteggio delle partite
+              compilate è già sotto il countdown, ripeterlo qui è rumore. */}
+          {saveState !== "idle" && (
+            <p className="text-center text-sm font-medium">
+              {saveState === "saving" && <span className="text-slate-500">Salvo…</span>}
+              {saveState === "saved" && <span className="text-emerald-700">Salvato</span>}
+              {saveState === "error" && <span className="text-red-700">Non salvato</span>}
+            </p>
+          )}
         </>
       )}
     </main>

@@ -50,6 +50,52 @@ function isStandalone(): boolean {
   );
 }
 
+/**
+ * Campanella attiva: sveglia, con le onde del suono.
+ * Campanella spenta: la stessa, sbarrata.
+ *
+ * Due disegni vicini e non due simboli diversi: si deve capire a colpo
+ * d'occhio che è la stessa cosa in due stati, non due funzioni.
+ */
+function Bell({ on }: { on: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      className={`h-14 w-14 ${on ? "text-emerald-600" : "text-slate-300"}`}
+      aria-hidden
+    >
+      <path
+        d="M6.5 9a5.5 5.5 0 0 1 11 0c0 3.3.7 4.9 1.4 5.7.4.5 0 1.3-.6 1.3H5.7c-.6 0-1-.8-.6-1.3.7-.8 1.4-2.4 1.4-5.7Z"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M10.2 19a2 2 0 0 0 3.6 0"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+      {on ? (
+        <path
+          d="M19.8 5.2a7.5 7.5 0 0 1 1.7 3.4M4.2 5.2a7.5 7.5 0 0 0-1.7 3.4"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+        />
+      ) : (
+        <path
+          d="m4 4 16 16"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+        />
+      )}
+    </svg>
+  );
+}
+
 export function PushToggle() {
   const [state, setState] = useState<State>("checking");
   const [busy, setBusy] = useState(false);
@@ -179,28 +225,36 @@ export function PushToggle() {
 
   return (
     <Box>
-      <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <p className="font-medium">
-            {state === "on" ? "Promemoria attivi" : "Promemoria del blocco"}
+      <div className="flex flex-col items-center gap-3 py-2 text-center">
+        <Bell on={state === "on"} />
+
+        <div>
+          <p className="text-lg font-semibold">
+            {state === "on" ? "Promemoria attivi" : "Promemoria disattivati"}
           </p>
-          <p className="text-sm text-slate-600">
+          <p className="mt-1 text-sm text-slate-600">
             {state === "on"
-              ? "Su questo dispositivo. Ti avviso qualche ora prima se non hai compilato."
-              : "Ti avviso qualche ora prima del blocco se ti mancano dei pronostici."}
+              ? "Su questo dispositivo ti avviso qualche ora prima del blocco, se ti mancano dei pronostici."
+              : "Attivali per ricevere un avviso qualche ora prima del blocco, se ti mancano dei pronostici."}
           </p>
         </div>
+
         <button
           onClick={state === "on" ? disable : enable}
           disabled={busy}
-          className={`shrink-0 rounded-xl px-4 py-3 text-sm font-semibold disabled:opacity-50 ${
+          className={`w-full rounded-xl px-4 py-3.5 font-semibold disabled:opacity-50 ${
             state === "on"
-              ? "border border-slate-300"
+              ? "border border-slate-300 text-slate-700"
               : "bg-slate-900 text-white"
           }`}
         >
-          {busy ? "…" : state === "on" ? "Disattiva" : "Attiva"}
+          {busy ? "Un attimo…" : state === "on" ? "Disattiva" : "Attiva"}
         </button>
+
+        <p className="text-xs text-slate-500">
+          Il permesso vale solo per questo dispositivo: se usi anche il
+          computer, vanno attivate anche lì.
+        </p>
       </div>
       {error && <p className="mt-2 text-sm text-red-700">{error}</p>}
     </Box>

@@ -1,10 +1,9 @@
 import { redirect } from "next/navigation";
 import { getSessionWithToken } from "@/lib/auth/session";
 import { userClient } from "@/lib/supabase/server";
-import { LogoutButton } from "./logout-button";
 import { TeamCrest } from "@/components/team-crest";
 import { Countdown } from "@/components/countdown";
-import { PushToggle } from "@/components/push-toggle";
+import { AppMenu } from "@/components/app-menu";
 
 function formatRome(iso: string): string {
   return new Date(iso).toLocaleString("it-IT", {
@@ -30,13 +29,13 @@ export default async function Home() {
 
   const { data: league } = await supabase
     .from("leagues")
-    .select("name, invite_code, season")
+    .select("name, season")
     .eq("id", session.leagueId)
     .maybeSingle();
 
   const { data: members } = await supabase
     .from("league_members")
-    .select("display_name, role")
+    .select("player_id, display_name, role")
     .eq("league_id", session.leagueId)
     .order("display_name");
 
@@ -47,11 +46,8 @@ export default async function Home() {
         <p className="mt-2 text-slate-600">
           La sessione è valida ma il database non restituisce la lega: di
           solito significa che le migrazioni SQL non sono state applicate
-          tutte. Controlla di aver eseguito la 0001, la 0002 e la 0003.
+          tutte.
         </p>
-        <div className="mt-6">
-          <LogoutButton />
-        </div>
       </main>
     );
   }
@@ -95,7 +91,6 @@ export default async function Home() {
   const isLocked =
     !!matchday?.lock_at && new Date(matchday.lock_at).getTime() <= Date.now();
 
-  // Quanti ne ho già compilati io: prima del lock RLS restituisce solo i miei.
   const { count: myPredictions } =
     matchday && !isLocked && (matches ?? []).length > 0
       ? await supabase
@@ -110,43 +105,40 @@ export default async function Home() {
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-6 p-4 pb-10">
-      <header className="pt-4">
-        <p className="text-sm text-slate-500">Ciao {session.displayName}</p>
-        <h1 className="text-2xl font-bold tracking-tight">{league.name}</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          Stagione {league.season}
-          {session.isAdmin && " · sei l'amministratore"}
-        </p>
+      <header className="flex items-start justify-between gap-3 pt-3">
+        <div className="min-w-0">
+          <p className="truncate text-base font-medium text-slate-500">
+            {league.name}
+          </p>
+          <h1 className="mt-0.5 truncate text-3xl font-bold tracking-tight">
+            Ciao{" "}
+            <span className={session.isAdmin ? "text-amber-500" : undefined}>
+              {session.displayName}
+            </span>
+          </h1>
+        </div>
+        <AppMenu isAdmin={session.isAdmin} />
       </header>
 
       {matchday ? (
         <section>
           <div className="mb-3 flex items-baseline justify-between">
             <h2 className="text-lg font-semibold">Giornata {matchday.number}</h2>
-            <span
-              className={`text-sm font-medium ${isLocked ? "text-amber-700" : "text-emerald-700"}`}
-            >
-              {isLocked ? "Bloccata" : "Aperta"}
-            </span>
+            {isLocked && (
+              <span className="text-sm font-medium text-amber-700">
+                Bloccata
+              </span>
+            )}
           </div>
 
           {matchday.lock_at && !isLocked && (
-            <div className="mb-3">
+            <div className="mb-4">
               <Countdown
                 lockAt={matchday.lock_at as string}
                 compiled={myPredictions ?? undefined}
                 total={(matches ?? []).length || undefined}
               />
-              <p className="mt-1 text-sm text-slate-500">
-                Si blocca il {formatRome(matchday.lock_at)}
-              </p>
             </div>
-          )}
-
-          {matchday.lock_at && isLocked && (
-            <p className="mb-3 text-sm text-slate-500">
-              Bloccata dal {formatRome(matchday.lock_at)}
-            </p>
           )}
 
           <a
@@ -157,10 +149,14 @@ export default async function Home() {
           </a>
 
           <ul className="flex flex-col gap-2">
-            {(matches ?? []).map((m) => (
+            {(matches ?? []).map((m, index) => (
               <li
                 key={m.id as string}
-                className="rounded-xl border border-slate-200 bg-white px-4 py-3"
+                // Righe a tono alternato: su dieci partite di fila l'occhio
+                // si perde, e una riga più chiara ogni due fa da guida.
+                className={`rounded-xl border border-slate-200 px-4 py-3 ${
+                  index % 2 === 0 ? "bg-slate-100" : "bg-white"
+                }`}
               >
                 <div className="flex items-center justify-between gap-3">
                   <span className="flex min-w-0 items-center gap-1.5 font-medium">
@@ -196,7 +192,11 @@ export default async function Home() {
                   m.status as string,
                 ) && (
                   <p className="mt-1 text-xs font-medium text-amber-700">
-                    {m.status === "POSTPONED" ? "Rinviata" : m.status === "SUSPENDED" ? "Sospesa" : "Annullata"}
+                    {m.status === "POSTPONED"
+                      ? "Rinviata"
+                      : m.status === "SUSPENDED"
+                        ? "Sospesa"
+                        : "Annullata"}
                   </p>
                 )}
               </li>
@@ -218,43 +218,40 @@ export default async function Home() {
         </section>
       )}
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <p className="text-sm font-medium text-slate-500">Codice d&apos;invito</p>
-        <p className="mt-1 text-3xl font-bold tracking-[0.3em]">
-          {league.invite_code}
-        </p>
-      </section>
-
       <section>
         <h2 className="mb-3 font-semibold">Giocatori ({members?.length ?? 0})</h2>
         <ul className="flex flex-col gap-2">
-          {(members ?? []).map((member) => (
-            <li
-              key={member.display_name as string}
-              className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3"
-            >
-              <span className="font-medium">{member.display_name}</span>
-              {member.role === "admin" && (
-                <span className="text-xs font-medium text-slate-500">admin</span>
-              )}
-            </li>
-          ))}
+          {(members ?? []).map((member) => {
+            const isMe = member.player_id === session.playerId;
+            return (
+              <li
+                key={member.player_id as string}
+                className={`flex items-center justify-between rounded-xl border px-4 py-3 ${
+                  isMe ? "border-slate-900 bg-white" : "border-slate-200 bg-white"
+                }`}
+              >
+                <span
+                  className={`${isMe ? "font-bold" : "font-medium"} ${
+                    member.role === "admin" ? "text-amber-500" : ""
+                  }`}
+                >
+                  {member.display_name}
+                  {isMe && (
+                    <span className="ml-2 text-xs font-medium text-slate-500">
+                      tu
+                    </span>
+                  )}
+                </span>
+                {member.role === "admin" && (
+                  <span className="text-xs font-medium text-amber-600">
+                    admin
+                  </span>
+                )}
+              </li>
+            );
+          })}
         </ul>
       </section>
-
-      <PushToggle />
-
-      <div className="flex items-center justify-between pt-2">
-        <a href="/regole" className="text-sm font-medium text-slate-700 underline">
-          Come si gioca
-        </a>
-        {session.isAdmin && (
-          <a href="/admin" className="text-sm font-medium text-slate-700 underline">
-            Pannello admin
-          </a>
-        )}
-        <LogoutButton />
-      </div>
     </main>
   );
 }

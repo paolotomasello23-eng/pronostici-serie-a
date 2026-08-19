@@ -61,12 +61,9 @@ export default async function StatistichePage() {
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-6 p-4 pb-10">
       <header className="pt-4">
-        <a href="/" className="text-sm text-slate-500 underline">
-          ← Torna alla lega
-        </a>
-        <h1 className="mt-2 text-2xl font-bold tracking-tight">Statistiche</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Statistiche</h1>
         <p className="text-sm text-slate-500">
-          {league.name} · {matchdays === 0
+          {matchdays === 0
             ? "nessuna giornata giocata"
             : matchdays === 1
               ? "1 giornata giocata"

@@ -85,13 +85,7 @@ export default async function ClassificaPage({
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-6 p-4 pb-10">
       <header className="pt-4">
-        <a href="/" className="text-sm text-slate-500 underline">
-          ← Torna alla lega
-        </a>
-        <h1 className="mt-2 text-2xl font-bold tracking-tight">Classifica</h1>
-        <p className="text-sm text-slate-500">
-          {league.name} · stagione {league.season}
-        </p>
+        <h1 className="text-2xl font-bold tracking-tight">Classifica</h1>
       </header>
 
       {all.length === 0 ? (

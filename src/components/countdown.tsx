@@ -8,8 +8,7 @@ import { useEffect, useState } from "react";
  * Il conto alla rovescia parte solo dopo che la pagina si è aperta nel
  * browser: server e telefono non hanno lo stesso orologio al millisecondo, e
  * far calcolare al server un valore che cambia ogni secondo produrrebbe una
- * discrepanza al primo caricamento. Meglio un trattino per un istante che un
- * numero sbagliato.
+ * discrepanza al primo caricamento.
  */
 function split(ms: number) {
   const total = Math.max(0, Math.floor(ms / 1000));
@@ -27,7 +26,6 @@ export function Countdown({
   total,
 }: {
   lockAt: string;
-  /** Quante partite hai già compilato: serve a distinguere l'urgenza. */
   compiled?: number;
   total?: number;
 }) {
@@ -42,73 +40,63 @@ export function Countdown({
   }, [lockAt]);
 
   if (remaining === null) {
-    return (
-      <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500">
-        Calcolo il tempo rimasto…
-      </div>
-    );
+    return <div className="h-[52px]" aria-hidden />;
   }
 
   if (remaining <= 0) {
     return (
-      <div className="rounded-2xl bg-slate-900 px-4 py-3 text-white">
-        <p className="font-semibold">Pronostici chiusi</p>
-        <p className="text-sm text-slate-300">La giornata è iniziata.</p>
-      </div>
+      <p className="text-center text-lg font-bold text-slate-500">
+        Pronostici chiusi
+      </p>
     );
   }
 
   const { giorni, ore, minuti, secondi } = split(remaining);
   const hours = remaining / 3_600_000;
 
-  // Tre livelli: c'è tempo, comincia a stringere, ultimissime ore.
-  const urgent = hours < 3;
-  const soon = hours < 24;
-
-  const incomplete =
-    compiled !== undefined && total !== undefined && compiled < total;
-
-  const tone = urgent
-    ? "border-red-300 bg-red-50 text-red-900"
-    : soon
-      ? "border-amber-300 bg-amber-50 text-amber-900"
-      : "border-slate-200 bg-white text-slate-900";
+  // Verde finché c'è tempo, giallo nell'ultimo giorno, rosso nelle ultime ore.
+  const color =
+    hours < 2
+      ? "text-red-600"
+      : hours < 24
+        ? "text-amber-500"
+        : "text-emerald-600";
 
   return (
-    <div className={`rounded-2xl border px-4 py-3 ${tone}`}>
-      <p className="text-sm font-medium opacity-80">
-        {urgent ? "Ultime ore per pronosticare" : "Tempo rimasto"}
-      </p>
-
-      <p className="mt-1 flex items-baseline gap-1 text-2xl font-bold tabular-nums">
-        {giorni > 0 && (
+    <div className="text-center">
+      <p className={`text-3xl font-bold tabular-nums ${color}`}>
+        {giorni > 0 ? (
           <>
-            <span>{giorni}</span>
-            <span className="text-base font-medium opacity-70">g</span>
+            {giorni}
+            <Unit>g</Unit>
+            {String(ore).padStart(2, "0")}
+            <Unit>h</Unit>
+            {String(minuti).padStart(2, "0")}
+            <Unit>m</Unit>
+          </>
+        ) : (
+          <>
+            {String(ore).padStart(2, "0")}
+            <Unit>h</Unit>
+            {String(minuti).padStart(2, "0")}
+            <Unit>m</Unit>
+            {String(secondi).padStart(2, "0")}
+            <Unit>s</Unit>
           </>
         )}
-        <span>{String(ore).padStart(2, "0")}</span>
-        <span className="text-base font-medium opacity-70">h</span>
-        <span>{String(minuti).padStart(2, "0")}</span>
-        <span className="text-base font-medium opacity-70">m</span>
-        {giorni === 0 && (
-          <>
-            <span>{String(secondi).padStart(2, "0")}</span>
-            <span className="text-base font-medium opacity-70">s</span>
-          </>
-        )}
       </p>
 
-      {incomplete && (
-        <p className="mt-1 text-sm font-medium">
-          Ti mancano {total! - compiled!} partite su {total}.
-        </p>
-      )}
-      {!incomplete && compiled !== undefined && (
-        <p className="mt-1 text-sm opacity-80">
-          Hai compilato tutte le partite. Puoi ancora cambiare idea.
+      {compiled !== undefined && total !== undefined && (
+        <p className="mt-1 text-sm text-slate-500">
+          Partite compilate: {compiled}/{total}
         </p>
       )}
     </div>
+  );
+}
+
+function Unit({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="mx-0.5 text-lg font-semibold opacity-60">{children}</span>
   );
 }
