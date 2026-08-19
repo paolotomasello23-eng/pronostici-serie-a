@@ -10,6 +10,7 @@ import { PronosticiForm } from "./form";
 export default async function PronosticiPage() {
   const auth = await getSessionWithToken();
   if (!auth) redirect("/entra");
+  if (!auth.session.leagueId) redirect("/leghe");
 
   const supabase = userClient(auth.token);
 

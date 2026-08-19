@@ -14,6 +14,7 @@ import type { PlayerRef } from "@/lib/scoring";
 export default async function StatistichePage() {
   const auth = await getSessionWithToken();
   if (!auth) redirect("/entra");
+  if (!auth.session.leagueId) redirect("/leghe");
 
   const supabase = userClient(auth.token);
 

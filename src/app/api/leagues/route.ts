@@ -77,6 +77,7 @@ export async function POST(request: Request) {
   await setSessionCookie(
     await createSessionToken({
       playerId: row.player_id,
+      username: row.display_name,
       leagueId: row.league_id,
       displayName: row.display_name,
       isAdmin: true,

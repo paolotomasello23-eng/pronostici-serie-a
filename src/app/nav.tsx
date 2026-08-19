@@ -15,7 +15,7 @@ import { usePathname } from "next/navigation";
  * navigare.
  */
 
-const HIDDEN_ON = ["/entra", "/crea-lega"];
+const HIDDEN_ON = ["/entra", "/crea-lega", "/leghe"];
 
 type IconProps = { className?: string };
 

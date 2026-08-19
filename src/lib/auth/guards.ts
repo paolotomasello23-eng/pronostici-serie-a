@@ -10,10 +10,13 @@ import { getSession, type Session } from "./session";
  * rilegge dal database, che è l'unico posto dove è vero adesso.
  */
 export async function requireAdmin(): Promise<
-  { ok: true; session: Session } | { ok: false; status: 401 | 403 }
+  | { ok: true; session: Session & { leagueId: string } }
+  | { ok: false; status: 401 | 403 }
 > {
   const session = await getSession();
   if (!session) return { ok: false, status: 401 };
+  // Senza una lega attiva non c'è niente da amministrare.
+  if (!session.leagueId) return { ok: false, status: 403 };
 
   const { data } = await serviceClient()
     .from("league_members")
@@ -24,5 +27,5 @@ export async function requireAdmin(): Promise<
 
   if (data?.role !== "admin") return { ok: false, status: 403 };
 
-  return { ok: true, session };
+  return { ok: true, session: { ...session, leagueId: session.leagueId } };
 }

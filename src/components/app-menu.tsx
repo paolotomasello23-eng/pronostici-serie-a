@@ -25,6 +25,17 @@ function MenuIcon({ className }: IconProps) {
   );
 }
 
+function LeaguesIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden>
+      <rect x="3.5" y="3.5" width="7" height="7" rx="1.8" stroke="currentColor" strokeWidth="1.7" />
+      <rect x="13.5" y="3.5" width="7" height="7" rx="1.8" stroke="currentColor" strokeWidth="1.7" />
+      <rect x="3.5" y="13.5" width="7" height="7" rx="1.8" stroke="currentColor" strokeWidth="1.7" />
+      <rect x="13.5" y="13.5" width="7" height="7" rx="1.8" stroke="currentColor" strokeWidth="1.7" />
+    </svg>
+  );
+}
+
 function BellIcon({ className }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden>
@@ -157,6 +168,12 @@ export function AppMenu({ isAdmin }: { isAdmin: boolean }) {
         </div>
 
         <nav className="flex flex-col p-2">
+          <Item
+            href="/leghe"
+            label="Le mie leghe"
+            Icon={LeaguesIcon}
+            tabIndex={open ? 0 : -1}
+          />
           <Item href="/notifiche" label="Notifiche" Icon={BellIcon} tabIndex={open ? 0 : -1} />
           <Item href="/regole" label="Regole" Icon={HelpIcon} tabIndex={open ? 0 : -1} />
           {isAdmin && (

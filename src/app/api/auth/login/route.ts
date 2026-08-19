@@ -3,54 +3,50 @@ import { z } from "zod";
 import { serviceClient } from "@/lib/supabase/server";
 import { isValidPinFormat, verifyPin } from "@/lib/auth/pin";
 import { createSessionToken, setSessionCookie } from "@/lib/auth/session";
-import { normalizeInviteCode } from "@/lib/leagues";
 
 const schema = z.object({
-  inviteCode: z.string().min(1).max(20),
-  displayName: z.string().trim().min(1).max(20),
+  username: z.string().trim().min(2).max(20),
   pin: z.string(),
 });
 
+/**
+ * Accesso con nome utente e PIN.
+ *
+ * Non serve più il codice della lega: quello identifica una lega, non una
+ * persona, e con il multi-lega la persona viene prima. Le leghe si scelgono
+ * dopo, nella schermata che le elenca.
+ */
 export async function POST(request: Request) {
   const parsed = schema.safeParse(await request.json().catch(() => null));
   if (!parsed.success || !isValidPinFormat(parsed.data.pin)) {
     return NextResponse.json({ error: "Dati di accesso non validi." }, { status: 400 });
   }
 
-  const { inviteCode, displayName, pin } = parsed.data;
+  const { username, pin } = parsed.data;
   const admin = serviceClient();
 
-  const { data: league } = await admin
-    .from("leagues")
-    .select("id")
-    .eq("invite_code", normalizeInviteCode(inviteCode))
-    .maybeSingle();
+  // Confronto senza distinzione tra maiuscole e minuscole, come l'indice
+  // che garantisce l'unicità. `ilike` qui è al sicuro: lo username è
+  // ripulito da zod e i caratteri jolly non superano la validazione.
+  const { data: players } = await admin
+    .from("players")
+    .select("id, username")
+    .ilike("username", username);
 
-  if (!league) {
-    return NextResponse.json({ error: "Codice non riconosciuto." }, { status: 404 });
-  }
-
-  // Confronto il nome in JS invece che con `ilike`: in un pattern SQL i
-  // caratteri `%` e `_` sono jolly, quindi un nome come "a%" farebbe match
-  // con quello di qualcun altro. I membri sono al massimo dieci.
-  const { data: allMembers } = await admin
-    .from("league_members")
-    .select("player_id, display_name, role")
-    .eq("league_id", league.id);
-
-  const wanted = displayName.trim().toLocaleLowerCase("it");
-  const member = (allMembers ?? []).find(
-    (m) => String(m.display_name).trim().toLocaleLowerCase("it") === wanted,
+  const player = (players ?? []).find(
+    (p) =>
+      String(p.username).trim().toLocaleLowerCase("it") ===
+      username.toLocaleLowerCase("it"),
   );
 
-  if (!member) {
+  if (!player) {
     return NextResponse.json(
-      { error: "Nessun giocatore con questo nome nella lega." },
+      { error: "Nessun account con questo nome utente." },
       { status: 404 },
     );
   }
 
-  const check = await verifyPin(admin, member.player_id as string, pin);
+  const check = await verifyPin(admin, player.id as string, pin);
 
   if (!check.ok) {
     if (check.reason === "locked") {
@@ -59,9 +55,7 @@ export async function POST(request: Request) {
         Math.ceil((check.until.getTime() - Date.now()) / 60_000),
       );
       return NextResponse.json(
-        {
-          error: `Troppi tentativi sbagliati. Riprova tra ${minutes} minuti.`,
-        },
+        { error: `Troppi tentativi sbagliati. Riprova tra ${minutes} minuti.` },
         { status: 429 },
       );
     }
@@ -76,14 +70,31 @@ export async function POST(request: Request) {
     );
   }
 
+  // Chi ha una lega sola entra direttamente: fargli scegliere da un elenco
+  // di uno solo sarebbe un passaggio a vuoto ogni volta.
+  const { data: memberships } = await admin
+    .from("league_members")
+    .select("league_id, display_name, role")
+    .eq("player_id", player.id as string)
+    .order("joined_at");
+
+  const only = (memberships ?? []).length === 1 ? memberships![0] : null;
+
   await setSessionCookie(
     await createSessionToken({
-      playerId: member.player_id as string,
-      leagueId: league.id as string,
-      displayName: member.display_name as string,
-      isAdmin: member.role === "admin",
+      playerId: player.id as string,
+      username: player.username as string,
+      leagueId: only ? (only.league_id as string) : null,
+      displayName: only
+        ? (only.display_name as string)
+        : (player.username as string),
+      isAdmin: only ? only.role === "admin" : false,
     }),
   );
 
-  return NextResponse.json({ ok: true, displayName: member.display_name });
+  return NextResponse.json({
+    ok: true,
+    leagues: (memberships ?? []).length,
+    goToLeagues: !only,
+  });
 }

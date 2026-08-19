@@ -25,6 +25,10 @@ import { serviceClient, userClient } from "@/lib/supabase/server";
 export async function GET(request: Request) {
   const auth = await getSessionWithToken();
   if (!auth) return NextResponse.json({ error: "Non autenticato." }, { status: 401 });
+  const leagueId = auth.session.leagueId;
+  if (!leagueId) {
+    return NextResponse.json({ error: "Nessuna lega selezionata." }, { status: 409 });
+  }
 
   const matchdayId = new URL(request.url).searchParams.get("matchdayId");
   if (!matchdayId) {
@@ -70,7 +74,7 @@ export async function GET(request: Request) {
     const { data: members } = await supabase
       .from("league_members")
       .select("player_id, display_name")
-      .eq("league_id", auth.session.leagueId);
+      .eq("league_id", leagueId);
     names = Object.fromEntries(
       (members ?? []).map((m) => [m.player_id as string, m.display_name as string]),
     );
@@ -102,6 +106,10 @@ const saveSchema = z.object({
 export async function POST(request: Request) {
   const auth = await getSessionWithToken();
   if (!auth) return NextResponse.json({ error: "Non autenticato." }, { status: 401 });
+  const leagueId = auth.session.leagueId;
+  if (!leagueId) {
+    return NextResponse.json({ error: "Nessuna lega selezionata." }, { status: 409 });
+  }
 
   const parsed = saveSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
@@ -158,7 +166,7 @@ export async function POST(request: Request) {
     .from("predictions")
     .upsert(
       predictions.map((p) => ({
-        league_id: auth.session.leagueId,
+        league_id: leagueId,
         player_id: auth.session.playerId,
         match_id: p.matchId,
         home_goals: p.homeGoals,

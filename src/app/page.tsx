@@ -19,6 +19,7 @@ function formatRome(iso: string): string {
 export default async function Home() {
   const auth = await getSessionWithToken();
   if (!auth) redirect("/entra");
+  if (!auth.session.leagueId) redirect("/leghe");
 
   const { session, token } = auth;
 

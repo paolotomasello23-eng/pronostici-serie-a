@@ -10,7 +10,11 @@ const SESSION_DAYS = 180;
 
 export interface Session {
   playerId: string;
-  leagueId: string;
+  /** Nome utente, unico su tutta l'app. */
+  username: string;
+  /** Lega attiva. Null subito dopo il login, prima di sceglierne una. */
+  leagueId: string | null;
+  /** Come ti chiami dentro la lega attiva. */
   displayName: string;
   isAdmin: boolean;
 }
@@ -31,6 +35,7 @@ export async function createSessionToken(session: Session): Promise<string> {
   return new SignJWT({
     role: "authenticated",
     league_id: session.leagueId,
+    username: session.username,
     display_name: session.displayName,
     is_admin: session.isAdmin,
   })
@@ -48,12 +53,19 @@ export async function verifySessionToken(token: string): Promise<Session | null>
       audience: "authenticated",
     });
 
-    if (!payload.sub || typeof payload.league_id !== "string") return null;
+    if (!payload.sub) return null;
+
+    const displayName = String(payload.display_name ?? "");
 
     return {
       playerId: payload.sub,
-      leagueId: payload.league_id,
-      displayName: String(payload.display_name ?? ""),
+      // I token emessi prima del multi-lega non hanno lo username: ai loro
+      // possessori vale il nome con cui giocavano, che è esattamente quello
+      // che la migrazione ha reso il loro nome utente. Così chi era già
+      // dentro resta dentro, senza doversi ricollegare.
+      username: String(payload.username ?? displayName),
+      leagueId: typeof payload.league_id === "string" ? payload.league_id : null,
+      displayName,
       isAdmin: payload.is_admin === true,
     };
   } catch {
