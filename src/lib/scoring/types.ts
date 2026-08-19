@@ -71,6 +71,8 @@ export interface StandingsRow {
   outcomeCount: number;
   /** Numero di risultati esatti: secondo spareggio. */
   exactCount: number;
+  /** Punti presi col bonus controcorrente, mostrati accanto agli altri conteggi. */
+  bonusPoints: number;
   /** Partite effettivamente pronosticate e già valutate. */
   scoredMatches: number;
   /**

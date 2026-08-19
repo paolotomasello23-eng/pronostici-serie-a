@@ -229,12 +229,20 @@ export function computeTrophies(stats: readonly PlayerStats[]): Trophy[] {
 
 /** Una riga di classifica per una singola statistica. */
 export interface StatEntry {
+  /**
+   * Chiave univoca della riga. Di norma è il giocatore, ma nella classifica
+   * delle migliori giornate lo stesso giocatore può comparire più volte, e
+   * allora serve distinguerle.
+   */
+  entryId: string;
   playerId: string;
   displayName: string;
   /** Il valore grezzo, per ordinare. */
   value: number;
   /** Il valore già scritto come va mostrato. */
   label: string;
+  /** Riga secondaria, quando c'è qualcosa da precisare. */
+  detail?: string;
   /** Posizione, condivisa a pari valore (1, 2, 2, 4). */
   rank: number;
 }
@@ -252,44 +260,30 @@ interface StatDefinition {
   description: string;
   pick: (stats: PlayerStats) => number;
   format: (value: number) => string;
-  /** true quando il primato è il valore più basso, come per le partite a zero. */
-  lowerIsBetter?: boolean;
 }
 
 const STATS: StatDefinition[] = [
   {
-    key: "punti",
-    title: "Punti totali",
-    description: "La somma di tutto",
-    pick: (s) => s.points,
-    format: (n) => `${n}`,
-  },
-  {
     key: "competenza",
-    title: "Competenza",
-    description: "Punti presi andando controcorrente",
+    title: "Coppa Competenza",
+    description: "Maggior numero di punti bonus",
     pick: (s) => s.uniqueBonusPoints,
     format: (n) => `${n}`,
   },
   {
-    key: "esiti",
-    title: "Esiti azzeccati",
-    description: "Quante volte hai indovinato chi vinceva",
-    pick: (s) => s.outcomeCount,
-    format: (n) => `${n}`,
-  },
-  {
     key: "esatti",
-    title: "Risultati esatti",
-    description: "Il punteggio preciso, non solo l'esito",
+    title: "Da dietro l'arco",
+    description: "Maggior numero di risultati esatti presi",
     pick: (s) => s.exactCount,
     format: (n) => `${n}`,
   },
   {
-    key: "media",
-    title: "Media a giornata",
-    description: "Punti divisi per le giornate giocate",
-    pick: (s) => s.averagePerMatchday,
+    key: "esiti",
+    title: "I maestri del +1",
+    description: "Maggior numero di esiti senza risultati esatti",
+    // Gli esatti valgono 3 e hanno già la loro classifica: qui contano solo
+    // gli esiti "puri", quelli che hanno fruttato un punto secco.
+    pick: (s) => s.outcomeCount - s.exactCount,
     format: (n) => `${n}`,
   },
   {
@@ -300,28 +294,69 @@ const STATS: StatDefinition[] = [
     format: (n) => `${n}`,
   },
   {
-    key: "miglioreGiornata",
-    title: "Miglior giornata",
-    description: "Il record personale in una sola giornata",
-    pick: (s) => s.bestMatchday?.points ?? 0,
-    format: (n) => `${n}`,
-  },
-  {
     key: "precisione",
     title: "Precisione",
-    description: "Percentuale di esiti azzeccati",
+    description: "La percentuale di partite indovinate",
     pick: (s) => s.outcomeRate,
     format: (n) => `${n}%`,
   },
-  {
-    key: "zero",
-    title: "Partite a zero",
-    description: "Meno ne hai, meglio è",
-    pick: (s) => s.blanks,
-    format: (n) => `${n}`,
-    lowerIsBetter: true,
-  },
 ];
+
+/** Quante prestazioni mostrare nella classifica delle migliori giornate. */
+const BEST_DAYS_LIMIT = 10;
+
+function assegnaPosizioni(rows: StatEntry[]): StatEntry[] {
+  let currentRank = 0;
+  rows.forEach((row, index) => {
+    const previous = rows[index - 1];
+    if (!previous || previous.value !== row.value) currentRank = index + 1;
+    row.rank = currentRank;
+  });
+  return rows;
+}
+
+/**
+ * Le migliori giornate di sempre.
+ *
+ * A differenza delle altre, questa non è una classifica di persone ma di
+ * prestazioni: lo stesso giocatore può occupare più posizioni, se ha avuto
+ * più giornate da incorniciare.
+ */
+function migliorigiornate(
+  scores: readonly ScoreWithMatchday[],
+  players: readonly PlayerRef[],
+): StatEntry[] {
+  const nomi = new Map(players.map((p) => [p.playerId, p.displayName]));
+  const totali = new Map<string, number>();
+
+  for (const score of scores) {
+    if (!nomi.has(score.playerId)) continue;
+    const chiave = `${score.playerId}|${score.matchdayNumber}`;
+    totali.set(chiave, (totali.get(chiave) ?? 0) + score.points);
+  }
+
+  const rows: StatEntry[] = [...totali.entries()]
+    .map(([chiave, punti]) => {
+      const [playerId, giornata] = chiave.split("|");
+      return {
+        entryId: chiave,
+        playerId,
+        displayName: nomi.get(playerId)!,
+        value: punti,
+        label: `${punti}`,
+        detail: `giornata ${giornata}`,
+        rank: 0,
+      };
+    })
+    .sort(
+      (a, b) =>
+        b.value - a.value ||
+        a.displayName.localeCompare(b.displayName, "it", { sensitivity: "base" }),
+    )
+    .slice(0, BEST_DAYS_LIMIT);
+
+  return assegnaPosizioni(rows);
+}
 
 /**
  * Trasforma le statistiche in una classifica per ciascuna di esse.
@@ -332,36 +367,45 @@ const STATS: StatDefinition[] = [
  */
 export function computeStatLeaderboards(
   stats: readonly PlayerStats[],
+  scores: readonly ScoreWithMatchday[] = [],
+  players: readonly PlayerRef[] = [],
 ): StatLeaderboard[] {
-  return STATS.map((stat) => {
-    const rows = [...stats]
-      .map((player) => ({
-        playerId: player.playerId,
-        displayName: player.displayName,
-        value: stat.pick(player),
-        label: stat.format(stat.pick(player)),
-        rank: 0,
-      }))
-      .sort(
-        (a, b) =>
-          (stat.lowerIsBetter ? a.value - b.value : b.value - a.value) ||
-          a.displayName.localeCompare(b.displayName, "it", {
-            sensitivity: "base",
-          }),
-      );
+  const dalleStatistiche = STATS.map((stat) => ({
+    key: stat.key,
+    title: stat.title,
+    description: stat.description,
+    entries: assegnaPosizioni(
+      [...stats]
+        .map((player) => ({
+          entryId: player.playerId,
+          playerId: player.playerId,
+          displayName: player.displayName,
+          value: stat.pick(player),
+          label: stat.format(stat.pick(player)),
+          rank: 0,
+        }))
+        .sort(
+          (a, b) =>
+            b.value - a.value ||
+            a.displayName.localeCompare(b.displayName, "it", {
+              sensitivity: "base",
+            }),
+        ),
+    ),
+  }));
 
-    let currentRank = 0;
-    rows.forEach((row, index) => {
-      const previous = rows[index - 1];
-      if (!previous || previous.value !== row.value) currentRank = index + 1;
-      row.rank = currentRank;
-    });
+  // Fra "giornate vinte" e "precisione", come da elenco.
+  const migliori: StatLeaderboard = {
+    key: "miglioreGiornata",
+    title: "Miglior giornata",
+    description: "Miglior punteggio di una sola giornata",
+    entries: migliorigiornate(scores, players),
+  };
 
-    return {
-      key: stat.key,
-      title: stat.title,
-      description: stat.description,
-      entries: rows,
-    };
-  });
+  const posizione = dalleStatistiche.findIndex((s) => s.key === "precisione");
+  return [
+    ...dalleStatistiche.slice(0, posizione),
+    migliori,
+    ...dalleStatistiche.slice(posizione),
+  ];
 }

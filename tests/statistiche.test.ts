@@ -189,44 +189,89 @@ describe("trofei", () => {
 
 describe("classifiche per statistica", () => {
   const stats = computePlayerStats(SCORES, PLAYERS);
-  const boards = computeStatLeaderboards(stats);
+  const boards = computeStatLeaderboards(stats, SCORES, PLAYERS);
   const board = (key: string) => boards.find((b) => b.key === key)!;
 
-  it("produce una classifica per ogni statistica", () => {
-    expect(boards.length).toBeGreaterThan(5);
+  it("produce le sei classifiche, nell'ordine stabilito", () => {
+    expect(boards.map((b) => b.key)).toEqual([
+      "competenza",
+      "esatti",
+      "esiti",
+      "giornateVinte",
+      "miglioreGiornata",
+      "precisione",
+    ]);
+  });
+
+  it("mette tutti i giocatori in ogni classifica di persone", () => {
     for (const b of boards) {
-      // Nessuno resta fuori: chi non ha punti compare comunque, in fondo.
+      if (b.key === "miglioreGiornata") continue; // classifica di prestazioni
       expect(b.entries).toHaveLength(PLAYERS.length);
     }
   });
 
-  it("ordina dal migliore al peggiore", () => {
-    expect(board("punti").entries.map((e) => [e.displayName, e.value])).toEqual([
-      ["Bruno", 6],
-      ["Anna", 4],
-      ["Carla", 3],
+  it("ordina la coppa competenza per punti bonus", () => {
+    expect(board("competenza").entries.map((e) => [e.displayName, e.value])).toEqual([
+      ["Bruno", 2],
+      ["Anna", 0],
+      ["Carla", 0],
     ]);
   });
 
-  it("sulle partite a zero mette davanti chi ne ha meno", () => {
-    // Qui il primato è il numero più basso: tutti a 1, quindi tutti primi.
-    const zero = board("zero");
-    expect(zero.entries.every((e) => e.rank === 1)).toBe(true);
+  it("i maestri del +1 contano gli esiti senza i risultati esatti", () => {
+    // Anna: 2 esiti di cui 1 esatto -> 1. Carla: 1 esito, ed è esatto -> 0.
+    const entries = board("esiti").entries;
+    expect(entries.find((e) => e.displayName === "Anna")!.value).toBe(1);
+    expect(entries.find((e) => e.displayName === "Carla")!.value).toBe(0);
   });
 
-  it("condivide la posizione a pari valore", () => {
-    const esatti = board("esatti");
-    // Anna, Bruno e Carla hanno un risultato esatto a testa.
-    expect(esatti.entries.map((e) => e.rank)).toEqual([1, 1, 1]);
+  it("la miglior giornata è una classifica di prestazioni, non di persone", () => {
+    const entries = board("miglioreGiornata").entries;
+
+    // Anna in giornata 1 e Bruno in giornata 2 hanno fatto 4 punti entrambi.
+    expect(entries.slice(0, 2).map((e) => [e.displayName, e.value])).toEqual([
+      ["Anna", 4],
+      ["Bruno", 4],
+    ]);
+    expect(entries[0].detail).toBe("giornata 1");
+
+    // Lo stesso giocatore può occupare più righe, con chiavi distinte.
+    const diBruno = entries.filter((e) => e.displayName === "Bruno");
+    expect(diBruno.length).toBe(2);
+    expect(new Set(entries.map((e) => e.entryId)).size).toBe(entries.length);
+  });
+
+  it("si ferma alle dieci migliori giornate", () => {
+    const tante = Array.from({ length: 30 }, (_, i) =>
+      score("anna", `m${i}`, i + 1, "esatto"),
+    );
+    const boards = computeStatLeaderboards(
+      computePlayerStats(tante, PLAYERS),
+      tante,
+      PLAYERS,
+    );
+    expect(boards.find((b) => b.key === "miglioreGiornata")!.entries).toHaveLength(10);
   });
 
   it("formatta la precisione come percentuale", () => {
     expect(board("precisione").entries[0].label).toMatch(/%$/);
   });
 
+  it("condivide la posizione a pari valore", () => {
+    // Anna e Carla sono entrambe a zero punti bonus.
+    const competenza = board("competenza").entries;
+    expect(competenza.map((e) => e.rank)).toEqual([1, 2, 2]);
+  });
+
   it("regge una lega senza punteggi", () => {
-    const vuota = computeStatLeaderboards(computePlayerStats([], PLAYERS));
-    expect(vuota.every((b) => b.entries.length === PLAYERS.length)).toBe(true);
-    expect(vuota.every((b) => b.entries.every((e) => e.rank === 1))).toBe(true);
+    const vuota = computeStatLeaderboards(
+      computePlayerStats([], PLAYERS),
+      [],
+      PLAYERS,
+    );
+    const persone = vuota.filter((b) => b.key !== "miglioreGiornata");
+    expect(persone.every((b) => b.entries.length === PLAYERS.length)).toBe(true);
+    expect(persone.every((b) => b.entries.every((e) => e.rank === 1))).toBe(true);
+    expect(vuota.find((b) => b.key === "miglioreGiornata")!.entries).toEqual([]);
   });
 });

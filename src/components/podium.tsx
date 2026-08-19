@@ -9,6 +9,8 @@ import { Avatar } from "@/components/avatar";
  */
 
 export interface PodiumRow {
+  /** Chiave univoca: nelle migliori giornate un giocatore compare più volte. */
+  id: string;
   playerId: string;
   displayName: string;
   /** Il valore già formattato: punti, percentuale, quello che è. */
@@ -126,7 +128,7 @@ export function Podium({
         <div className="flex items-end justify-center gap-2 rounded-2xl bg-slate-100 px-2 py-4">
           {ordinati.map(({ row, position }) => (
             <Step
-              key={row.playerId}
+              key={row.id}
               row={row}
               position={position}
               avatarUrl={avatarOf.get(row.playerId)}
@@ -140,7 +142,7 @@ export function Podium({
         <ul className="flex flex-col gap-2">
           {resto.map((row, index) => (
             <li
-              key={row.playerId}
+              key={row.id}
               className={`flex items-center gap-3 rounded-xl border bg-white px-3 py-2.5 ${
                 row.playerId === me ? "border-slate-900" : "border-slate-200"
               }`}

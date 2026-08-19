@@ -40,9 +40,11 @@ export function StatCard({
   }, [open]);
 
   const rows: PodiumRow[] = stat.entries.map((e) => ({
+    id: e.entryId,
     playerId: e.playerId,
     displayName: e.displayName,
     label: e.label,
+    detail: e.detail,
   }));
 
   const primi = stat.entries.slice(0, 3);
@@ -71,7 +73,7 @@ export function StatCard({
         <div className="mt-3 flex gap-2">
           {primi.map((entry, index) => (
             <div
-              key={entry.playerId}
+              key={entry.entryId}
               className="flex min-w-0 flex-1 flex-col items-center gap-1 rounded-xl bg-slate-800 px-2 py-2.5"
             >
               <span className={`block rounded-full ring-2 ${tinta(index + 1, false)}`}>

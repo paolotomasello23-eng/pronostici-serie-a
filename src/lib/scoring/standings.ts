@@ -29,6 +29,7 @@ export function computeStandings(
       points: 0,
       outcomeCount: 0,
       exactCount: 0,
+      bonusPoints: 0,
       scoredMatches: 0,
       rank: 0,
     });
@@ -45,6 +46,7 @@ export function computeStandings(
     row.scoredMatches += 1;
     if (score.outcomeCorrect) row.outcomeCount += 1;
     if (score.exact) row.exactCount += 1;
+    row.bonusPoints += score.uniqueBonus;
   }
 
   const rows = [...byPlayer.values()].sort(compareStandingsRows);

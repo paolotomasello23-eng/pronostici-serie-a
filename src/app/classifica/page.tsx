@@ -101,16 +101,11 @@ export default async function ClassificaPage({
 
       <>
           <section>
-            <h2 className="mb-3 font-semibold">Generale</h2>
             <Podium
               rows={toPodium(overall)}
               me={auth.session.playerId}
               avatarOf={avatarOf}
             />
-            <p className="mt-2 text-xs text-slate-500">
-              A parità di punti conta chi ha azzeccato più esiti, poi più
-              risultati esatti.
-            </p>
           </section>
 
           {selected !== null && matchdayStandings && (
@@ -157,7 +152,8 @@ function toPodium(rows: StandingsRow[]): PodiumRow[] {
   return rows.map((row) => ({
     playerId: row.playerId,
     displayName: row.displayName,
+    id: row.playerId,
     label: String(row.points),
-    detail: `${row.outcomeCount} esiti · ${row.exactCount} esatti`,
+    detail: `${row.outcomeCount} esiti · ${row.exactCount} esatti · ${row.bonusPoints} bonus`,
   }));
 }

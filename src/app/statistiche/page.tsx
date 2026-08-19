@@ -66,20 +66,12 @@ export default async function StatistichePage() {
   }));
 
   const stats = computePlayerStats(scores, players);
-  const leaderboards = computeStatLeaderboards(stats);
-  const matchdays = new Set(scores.map((s) => s.matchdayNumber)).size;
+  const leaderboards = computeStatLeaderboards(stats, scores, players);
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-6 p-4 pb-10">
       <header className="pt-4">
         <h1 className="text-2xl font-bold tracking-tight">Statistiche</h1>
-        <p className="text-sm text-slate-500">
-          {matchdays === 0
-            ? "nessuna giornata giocata"
-            : matchdays === 1
-              ? "1 giornata giocata"
-              : `${matchdays} giornate giocate`}
-        </p>
       </header>
 
       <div className="flex flex-col gap-3">
