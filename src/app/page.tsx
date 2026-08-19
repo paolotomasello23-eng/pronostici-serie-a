@@ -4,6 +4,7 @@ import { userClient } from "@/lib/supabase/server";
 import { TeamCrest } from "@/components/team-crest";
 import { Countdown } from "@/components/countdown";
 import { AppMenu } from "@/components/app-menu";
+import { Avatar } from "@/components/avatar";
 
 function formatRome(iso: string): string {
   return new Date(iso).toLocaleString("it-IT", {
@@ -92,6 +93,15 @@ export default async function Home() {
   const isLocked =
     !!matchday?.lock_at && new Date(matchday.lock_at).getTime() <= Date.now();
 
+  const { data: avatars } = await supabase
+    .from("v_member_avatars")
+    .select("player_id, avatar_url")
+    .eq("league_id", session.leagueId);
+
+  const avatarOf = new Map(
+    (avatars ?? []).map((a) => [a.player_id as string, a.avatar_url as string | null]),
+  );
+
   const { count: myPredictions } =
     matchday && !isLocked && (matches ?? []).length > 0
       ? await supabase
@@ -108,10 +118,7 @@ export default async function Home() {
     <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-6 p-4 pb-10">
       <header className="flex items-start justify-between gap-3 pt-3">
         <div className="min-w-0">
-          <p className="truncate text-base font-medium text-slate-500">
-            {league.name}
-          </p>
-          <h1 className="mt-0.5 truncate text-3xl font-bold tracking-tight">
+          <h1 className="truncate text-3xl font-bold tracking-tight">
             Ciao{" "}
             <span className={session.isAdmin ? "text-amber-500" : undefined}>
               {session.displayName}
@@ -231,17 +238,24 @@ export default async function Home() {
                   isMe ? "border-slate-900 bg-white" : "border-slate-200 bg-white"
                 }`}
               >
-                <span
-                  className={`${isMe ? "font-bold" : "font-medium"} ${
-                    member.role === "admin" ? "text-amber-500" : ""
-                  }`}
-                >
-                  {member.display_name}
-                  {isMe && (
-                    <span className="ml-2 text-xs font-medium text-slate-500">
-                      tu
-                    </span>
-                  )}
+                <span className="flex min-w-0 items-center gap-3">
+                  <Avatar
+                    src={avatarOf.get(member.player_id as string)}
+                    name={member.display_name as string}
+                    size={36}
+                  />
+                  <span
+                    className={`truncate ${isMe ? "font-bold" : "font-medium"} ${
+                      member.role === "admin" ? "text-amber-500" : ""
+                    }`}
+                  >
+                    {member.display_name}
+                    {isMe && (
+                      <span className="ml-2 text-xs font-medium text-slate-500">
+                        tu
+                      </span>
+                    )}
+                  </span>
                 </span>
                 {member.role === "admin" && (
                   <span className="text-xs font-medium text-amber-600">

@@ -4,6 +4,7 @@ import { userClient } from "@/lib/supabase/server";
 import { computePlayerStats, computeTrophies } from "@/lib/scoring/stats";
 import type { ScoreWithMatchday } from "@/lib/scoring/stats";
 import type { PlayerRef } from "@/lib/scoring";
+import { Avatar } from "@/components/avatar";
 
 /**
  * Statistiche di lega.
@@ -35,6 +36,15 @@ export default async function StatistichePage() {
     playerId: m.player_id as string,
     displayName: m.display_name as string,
   }));
+
+  const { data: avatars } = await supabase
+    .from("v_member_avatars")
+    .select("player_id, avatar_url")
+    .eq("league_id", auth.session.leagueId);
+
+  const avatarOf = new Map(
+    (avatars ?? []).map((a) => [a.player_id as string, a.avatar_url as string | null]),
+  );
 
   const { data: rows } = await supabase
     .from("v_scores_by_matchday")
@@ -113,9 +123,18 @@ export default async function StatistichePage() {
                       : "border-slate-200"
                   }`}
                 >
-                  <div className="flex items-baseline justify-between">
-                    <span className="font-semibold">{player.displayName}</span>
-                    <span className="text-lg font-bold tabular-nums">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="flex min-w-0 items-center gap-3">
+                      <Avatar
+                        src={avatarOf.get(player.playerId)}
+                        name={player.displayName}
+                        size={40}
+                      />
+                      <span className="truncate font-semibold">
+                        {player.displayName}
+                      </span>
+                    </span>
+                    <span className="shrink-0 text-lg font-bold tabular-nums">
                       {player.points} pt
                     </span>
                   </div>

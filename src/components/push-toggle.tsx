@@ -13,7 +13,6 @@ import { useCallback, useEffect, useState } from "react";
 type State =
   | "checking"
   | "unsupported"
-  | "needs-install" // iPhone: senza app sulla Home, iOS non le consegna
   | "denied"
   | "off"
   | "on";
@@ -33,21 +32,6 @@ function urlBase64ToUint8Array(base64: string): Uint8Array<ArrayBuffer> {
   const bytes = new Uint8Array(new ArrayBuffer(raw.length));
   for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
   return bytes;
-}
-
-function isIos(): boolean {
-  return (
-    /iphone|ipad|ipod/i.test(navigator.userAgent) ||
-    // Gli iPad recenti si presentano come Mac, ma hanno il touch.
-    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
-  );
-}
-
-function isStandalone(): boolean {
-  return (
-    window.matchMedia("(display-mode: standalone)").matches ||
-    (window.navigator as { standalone?: boolean }).standalone === true
-  );
 }
 
 /**
@@ -111,9 +95,7 @@ export function PushToggle() {
     }
 
     if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
-      // Su iPhone il supporto compare solo dopo l'installazione: distinguere
-      // i due casi evita di dire "non supportato" a chi invece può averle.
-      setState(isIos() && !isStandalone() ? "needs-install" : "unsupported");
+      setState("unsupported");
       return;
     }
 
@@ -196,20 +178,6 @@ export function PushToggle() {
   if (state === "checking") return null;
 
   if (state === "unsupported") return null;
-
-  if (state === "needs-install") {
-    return (
-      <Box>
-        <p className="font-medium">Vuoi il promemoria sul telefono?</p>
-        <p className="mt-1 text-sm text-slate-600">
-          Su iPhone le notifiche funzionano solo con l&apos;app aggiunta alla
-          schermata Home: tocca <strong>Condividi</strong> e poi{" "}
-          <strong>Aggiungi a Home</strong>. Poi riapri l&apos;app da lì e torna
-          qui.
-        </p>
-      </Box>
-    );
-  }
 
   if (state === "denied") {
     return (

@@ -40,6 +40,24 @@ interface ApiMatch {
   score?: { fullTime?: { home: number | null; away: number | null } };
 }
 
+/**
+ * Nomi brevi che brevi non sono.
+ *
+ * football-data restituisce "Como 1907" e "Venezia FC" anche nel campo
+ * pensato per la forma corta. Accanto allo stemma e alle caselle dei gol,
+ * su un telefono, ogni carattere in piu' toglie spazio: li accorciamo qui,
+ * una volta sola, invece che in ogni pagina che li mostra.
+ */
+const SHORT_NAME_OVERRIDES: Record<string, string> = {
+  "Como 1907": "Como",
+  "Venezia FC": "Venezia",
+};
+
+function shortName(team: ApiTeam): string {
+  const raw = team.shortName ?? team.name ?? "";
+  return SHORT_NAME_OVERRIDES[raw] ?? raw;
+}
+
 const KNOWN_STATUSES: readonly string[] = [
   "SCHEDULED", "TIMED", "IN_PLAY", "PAUSED",
   "FINISHED", "POSTPONED", "SUSPENDED", "CANCELLED",
@@ -109,9 +127,9 @@ export async function fetchMatchdayFromApi(
     return {
       externalId: String(m.id),
       homeTeam: m.homeTeam.name ?? "Squadra casa",
-      homeTeamShort: m.homeTeam.shortName ?? m.homeTeam.name ?? "Casa",
+      homeTeamShort: shortName(m.homeTeam) || "Casa",
       awayTeam: m.awayTeam.name ?? "Squadra trasferta",
-      awayTeamShort: m.awayTeam.shortName ?? m.awayTeam.name ?? "Trasferta",
+      awayTeamShort: shortName(m.awayTeam) || "Trasferta",
       homeTeamCrest: m.homeTeam.crest ?? null,
       awayTeamCrest: m.awayTeam.crest ?? null,
       kickoffAt: m.utcDate,

@@ -25,6 +25,20 @@ function MenuIcon({ className }: IconProps) {
   );
 }
 
+function UserIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden>
+      <circle cx="12" cy="8.5" r="3.8" stroke="currentColor" strokeWidth="1.7" />
+      <path
+        d="M4.8 20c.6-3.6 3.6-5.6 7.2-5.6s6.6 2 7.2 5.6"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 function LeaguesIcon({ className }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden>
@@ -168,6 +182,12 @@ export function AppMenu({ isAdmin }: { isAdmin: boolean }) {
         </div>
 
         <nav className="flex flex-col p-2">
+          <Item
+            href="/profilo"
+            label="Il mio profilo"
+            Icon={UserIcon}
+            tabIndex={open ? 0 : -1}
+          />
           <Item
             href="/leghe"
             label="Le mie leghe"

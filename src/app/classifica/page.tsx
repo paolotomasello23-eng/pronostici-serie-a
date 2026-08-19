@@ -3,6 +3,7 @@ import { getSessionWithToken } from "@/lib/auth/session";
 import { userClient } from "@/lib/supabase/server";
 import { computeStandings } from "@/lib/scoring";
 import type { MatchScore, PlayerRef, StandingsRow } from "@/lib/scoring";
+import { Avatar } from "@/components/avatar";
 
 /**
  * Classifica generale e di giornata.
@@ -43,6 +44,15 @@ export default async function ClassificaPage({
     playerId: m.player_id as string,
     displayName: m.display_name as string,
   }));
+
+  const { data: avatars } = await supabase
+    .from("v_member_avatars")
+    .select("player_id, avatar_url")
+    .eq("league_id", auth.session.leagueId);
+
+  const avatarOf = new Map(
+    (avatars ?? []).map((a) => [a.player_id as string, a.avatar_url as string | null]),
+  );
 
   const { data: rows } = await supabase
     .from("v_scores_by_matchday")
@@ -98,7 +108,7 @@ export default async function ClassificaPage({
         <>
           <section>
             <h2 className="mb-3 font-semibold">Generale</h2>
-            <Table rows={overall} me={auth.session.playerId} />
+            <Table rows={overall} me={auth.session.playerId} avatarOf={avatarOf} />
             <p className="mt-2 text-xs text-slate-500">
               A parità di punti conta chi ha azzeccato più esiti, poi più
               risultati esatti.
@@ -125,7 +135,11 @@ export default async function ClassificaPage({
                 ))}
               </div>
 
-              <Table rows={matchdayStandings} me={auth.session.playerId} />
+              <Table
+                rows={matchdayStandings}
+                me={auth.session.playerId}
+                avatarOf={avatarOf}
+              />
 
               <a
                 href="/pronostici"
@@ -141,7 +155,15 @@ export default async function ClassificaPage({
   );
 }
 
-function Table({ rows, me }: { rows: StandingsRow[]; me: string }) {
+function Table({
+  rows,
+  me,
+  avatarOf,
+}: {
+  rows: StandingsRow[];
+  me: string;
+  avatarOf: Map<string, string | null>;
+}) {
   return (
     <ul className="flex flex-col gap-2">
       {rows.map((row) => (
@@ -153,9 +175,10 @@ function Table({ rows, me }: { rows: StandingsRow[]; me: string }) {
               : "border-slate-200 bg-white"
           }`}
         >
-          <span className="w-6 shrink-0 text-center font-semibold tabular-nums text-slate-500">
+          <span className="w-5 shrink-0 text-center font-semibold tabular-nums text-slate-500">
             {row.rank}
           </span>
+          <Avatar src={avatarOf.get(row.playerId)} name={row.displayName} size={36} />
           <span className="min-w-0 flex-1">
             <span
               className={`block truncate ${row.playerId === me ? "font-bold" : "font-medium"}`}

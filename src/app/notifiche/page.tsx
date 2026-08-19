@@ -21,11 +21,6 @@ export default async function NotifichePage() {
           ancora delle partite da compilare. Se hai già finito, non ti
           disturbo.
         </p>
-        <p className="mt-3 font-medium text-slate-900">Su iPhone</p>
-        <p className="mt-1">
-          Funzionano solo se hai aggiunto l&apos;app alla schermata Home e la
-          apri da lì. Aperta da Safari, iOS non consegna le notifiche.
-        </p>
       </section>
     </main>
   );
