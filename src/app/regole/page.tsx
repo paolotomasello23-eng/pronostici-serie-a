@@ -1,113 +1,173 @@
 /**
- * Le regole, scritte per chi entra la prima volta.
+ * Il regolamento.
  *
  * Pagina statica: nessuna query, nessun JavaScript. Deve aprirsi subito
  * anche dal telefono in mezzo al traffico.
  */
+
+type IconProps = { className?: string };
+
+/** Bersaglio: il risultato esatto. */
+function TargetIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden>
+      <circle cx="12" cy="12" r="8.5" stroke="currentColor" strokeWidth="1.7" />
+      <circle cx="12" cy="12" r="4.5" stroke="currentColor" strokeWidth="1.7" />
+      <circle cx="12" cy="12" r="1.4" fill="currentColor" />
+    </svg>
+  );
+}
+
+/** Spunta: l'esito indovinato. */
+function CheckIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden>
+      <circle cx="12" cy="12" r="8.5" stroke="currentColor" strokeWidth="1.7" />
+      <path
+        d="m8.2 12.3 2.6 2.6 5-5.4"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+/** Stella: il bonus competenza. */
+function StarIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden>
+      <path
+        d="M12 3.6l2.6 5.3 5.8.85-4.2 4.1 1 5.75L12 16.9l-5.2 2.7 1-5.75-4.2-4.1 5.8-.85L12 3.6Z"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export default function RegolePage() {
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-8 p-5">
       <header className="pt-4">
-        <h1 className="text-2xl font-bold tracking-tight">Come si gioca</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Regolamento</h1>
       </header>
 
       <section className="flex flex-col gap-3">
+        <h2 className="text-lg font-semibold">Modalità di gioco</h2>
         <p>
-          Ogni giornata di Serie A ci sono 10 partite. Prima che si cominci,
-          scrivi come pensi che finirà ognuna. Non basta dire chi vince: serve
-          il risultato preciso, tipo <strong>2-1</strong>.
+          Per ogni giornata di campionato, ciascun partecipante è tenuto a
+          pronosticare il risultato esatto delle 10 partite di Serie A.
         </p>
+        <ul className="flex list-disc flex-col gap-2 pl-5 text-sm text-slate-700 marker:text-slate-400">
+          <li>
+            I pronostici possono essere liberamente inseriti o modificati fino
+            all&apos;orario ufficiale del fischio d&apos;inizio della prima
+            giornata. Contestualmente all&apos;avvio della prima gara, il
+            sistema bloccherà le partite e non sarà più possibile modificare i
+            propri pronostici.
+          </li>
+          <li>
+            Il salvataggio dei pronostici avviene in tempo reale e in modo
+            automatico. Sarà infatti possibile pronosticare alcune partite in un
+            momento ed altre in un altro.
+          </li>
+          <li>
+            Gli incontri privi di pronostico al momento della chiusura
+            comporteranno l&apos;assegnazione di 0 punti.
+          </li>
+          <li>
+            Fino al momento del blocco definitivo i pronostici rimarranno
+            riservati. A termini scaduti sarà possibile vedere i pronostici di
+            tutti i partecipanti.
+          </li>
+        </ul>
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">I punti</h2>
+        <h2 className="text-lg font-semibold">Calcolo dei punteggi</h2>
+        <p className="text-sm text-slate-700">
+          I punti assegnati per ciascun singolo incontro sono determinati dalle
+          seguenti componenti.
+        </p>
+
+        <h3 className="mt-1 font-semibold">Punti base</h3>
         <ul className="flex flex-col gap-2">
-          <li className="rounded-xl border border-slate-200 bg-white px-4 py-3">
-            <span className="text-xl font-bold">3 punti</span>
-            <span className="block text-sm text-slate-600">
-              se azzecchi il risultato esatto
+          <li className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3">
+            <TargetIcon className="mt-0.5 h-7 w-7 shrink-0 text-emerald-600" />
+            <span className="min-w-0">
+              <span className="block font-semibold">
+                Risultato esatto: 3 punti
+              </span>
+              <span className="block text-xs text-slate-600">
+                esatta corrispondenza tra pronostico e punteggio finale
+              </span>
             </span>
           </li>
-          <li className="rounded-xl border border-slate-200 bg-white px-4 py-3">
-            <span className="text-xl font-bold">1 punto</span>
-            <span className="block text-sm text-slate-600">
-              se azzecchi solo chi vince (o il pareggio), ma sbagli il risultato
-            </span>
-          </li>
-          <li className="rounded-xl border border-slate-200 bg-white px-4 py-3">
-            <span className="text-xl font-bold">+2 bonus</span>
-            <span className="block text-sm text-slate-600">
-              ogni partita mette in palio 2 punti per chi va controcorrente:
-              se sei l&apos;unico a indovinare li prendi tutti, se siete in
-              due fate 1 punto a testa, se siete in tre o più non li prende
-              nessuno
+          <li className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3">
+            <CheckIcon className="mt-0.5 h-7 w-7 shrink-0 text-sky-600" />
+            <span className="min-w-0">
+              <span className="block font-semibold">Esito: 1 punto</span>
+              <span className="block text-xs text-slate-600">
+                corretta individuazione della squadra vincente o del pareggio,
+                ma con punteggio errato
+              </span>
             </span>
           </li>
         </ul>
-        <p className="text-sm text-slate-600">
-          I primi due non si sommano: o 3 o 1. Il bonus invece si aggiunge.
+
+        <h3 className="mt-2 font-semibold">Bonus competenza</h3>
+        <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3">
+          <StarIcon className="mt-0.5 h-7 w-7 shrink-0 text-amber-500" />
+          <div className="min-w-0">
+            <p className="text-sm text-slate-700">
+              Cumulabile con i punti base, viene distribuito ai concorrenti che
+              indovinano l&apos;esito (o il risultato esatto) contro la
+              maggioranza della lega, a condizione che almeno 3 partecipanti
+              abbiano inserito un pronostico per la partita in questione.
+            </p>
+            <ul className="mt-2 flex flex-col gap-1 text-sm">
+              <li className="flex items-baseline justify-between gap-3">
+                <span className="text-slate-600">Unico vincitore</span>
+                <span className="shrink-0 font-semibold tabular-nums">
+                  +2 punti
+                </span>
+              </li>
+              <li className="flex items-baseline justify-between gap-3">
+                <span className="text-slate-600">Due vincitori</span>
+                <span className="shrink-0 font-semibold tabular-nums">
+                  +1 punto a testa
+                </span>
+              </li>
+              <li className="flex items-baseline justify-between gap-3">
+                <span className="text-slate-600">Tre o più vincitori</span>
+                <span className="shrink-0 font-semibold tabular-nums">
+                  0 punti
+                </span>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <p className="text-xs italic text-slate-500">
+          Punteggio massimo teorico per singola gara: 5 punti, derivante da 3
+          punti per il risultato esatto + 2 punti di bonus controcorrente.
         </p>
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">Un esempio</h2>
-        <p>
-          Torino-Milan finisce <strong>2-1</strong>.
+        <h2 className="text-lg font-semibold">Classifica generale</h2>
+        <p className="text-sm text-slate-700">
+          La classifica si aggiorna automaticamente al termine di ciascun
+          incontro. In caso di parità di punteggio tra due o più concorrenti, si
+          applicheranno nell&apos;ordine i seguenti criteri di spareggio:
         </p>
-        <ul className="flex flex-col gap-2 text-sm">
-          <li className="rounded-lg bg-white px-4 py-2 ring-1 ring-slate-200">
-            Avevi scritto <strong>2-1</strong> → 3 punti
-          </li>
-          <li className="rounded-lg bg-white px-4 py-2 ring-1 ring-slate-200">
-            Avevi scritto <strong>3-0</strong> → 1 punto (vinceva il Torino, ma
-            non era quello il risultato)
-          </li>
-          <li className="rounded-lg bg-white px-4 py-2 ring-1 ring-slate-200">
-            Avevi scritto <strong>1-2</strong> → 0 punti
-          </li>
-        </ul>
-        <p className="text-sm text-slate-600">
-          E se tutti avevano puntato sul Milan e solo tu sul Torino, ti prendi
-          anche i 2 punti di bonus: 1+2 = <strong>3 punti</strong>, oppure
-          3+2 = <strong>5 punti</strong> se avevi indovinato pure il
-          risultato. Se invece anche un altro aveva detto Torino, il bonus si
-          divide: 1 punto a testa. In tre o più non lo prende nessuno.
-        </p>
-        <p className="text-sm text-slate-600">
-          Il bonus vale solo se almeno in tre hanno pronosticato quella
-          partita.
-        </p>
-      </section>
-
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">Quando si compila</h2>
-        <p>
-          Quando vuoi, fino al fischio d&apos;inizio della{" "}
-          <strong>prima partita</strong> della giornata — di solito il sabato
-          pomeriggio. Fino a quel momento puoi cambiare idea quante volte ti
-          pare.
-        </p>
-        <p>
-          Poi si blocca tutto insieme e non si tocca più niente. Da lì in avanti
-          i pronostici di tutti diventano visibili: prima del blocco nessuno può
-          sbirciare quelli degli altri, nemmeno volendo.
-        </p>
-        <p className="text-sm text-slate-600">
-          Non devi finire tutte e 10 in una volta: si salva da solo mentre
-          scrivi. Le partite lasciate in bianco valgono zero.
-        </p>
-      </section>
-
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">La classifica</h2>
-        <p>
-          Si aggiorna da sola quando le partite finiscono, senza che nessuno
-          debba fare niente.
-        </p>
-        <p>
-          A pari punti passa avanti chi ha indovinato più esiti (chi vinceva o
-          pareggiava). Se siete ancora pari, chi ha più risultati esatti.
-        </p>
+        <ol className="flex list-decimal flex-col gap-1 pl-5 text-sm text-slate-700 marker:font-semibold marker:text-slate-400">
+          <li>Maggior numero complessivo di esiti indovinati;</li>
+          <li>Maggior numero complessivo di risultati esatti indovinati.</li>
+        </ol>
       </section>
 
       <div className="pb-4">
