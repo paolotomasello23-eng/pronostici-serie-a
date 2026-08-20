@@ -140,6 +140,9 @@ export default async function Home() {
     <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-6 p-4 pb-10">
       <header className="flex items-start justify-between gap-3 pt-3">
         <div className="min-w-0">
+          <p className="truncate text-lg font-semibold text-slate-500">
+            {league.name}
+          </p>
           <h1 className="truncate text-3xl font-bold tracking-tight">
             Ciao{" "}
             <span className={session.isAdmin ? "text-amber-500" : undefined}>

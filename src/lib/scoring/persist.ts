@@ -70,11 +70,21 @@ export async function recomputeMatchday(
 
   const matchIds = all.map((m) => m.id as string);
 
+  // I pronostici non appartengono più a una lega: sono della persona. Per
+  // questa classifica contano solo quelli dei suoi membri — e il filtro non
+  // è cosmetico, perché il bonus controcorrente si calcola su quanti hanno
+  // azzeccato *dentro questa lega*.
+  const { data: membri } = await admin
+    .from("league_members")
+    .select("player_id")
+    .eq("league_id", leagueId);
+
+  const iscritti = new Set((membri ?? []).map((m) => m.player_id as string));
+
   const { data: rows, error: predictionsError } = matchIds.length
     ? await admin
         .from("predictions")
         .select("player_id, match_id, home_goals, away_goals")
-        .eq("league_id", leagueId)
         .in("match_id", matchIds)
     : { data: [], error: null };
 
@@ -82,7 +92,9 @@ export async function recomputeMatchday(
     throw new Error(`Pronostici non leggibili: ${predictionsError.message}`);
   }
 
-  const predictions: Prediction[] = (rows ?? []).map((p) => ({
+  const predictions: Prediction[] = (rows ?? [])
+    .filter((p) => iscritti.has(p.player_id as string))
+    .map((p) => ({
     playerId: p.player_id as string,
     matchId: p.match_id as string,
     homeGoals: p.home_goals as number,

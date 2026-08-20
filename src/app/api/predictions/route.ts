@@ -58,7 +58,7 @@ export async function GET(request: Request) {
 
   const matchIds = (matches ?? []).map((m) => m.id as string);
 
-  const { data: predictions } = matchIds.length
+  const { data: tuttiPronostici } = matchIds.length
     ? await supabase
         .from("predictions")
         .select("match_id, player_id, home_goals, away_goals, outcome")
@@ -70,18 +70,29 @@ export async function GET(request: Request) {
   const isOpen = arePredictionsOpen(lockAt);
   const opensAt = lockAt ? predictionsOpenAt(lockAt).toISOString() : null;
 
+  // Il pronostico è della persona e vale in tutte le sue leghe: chi gioca in
+  // due gruppi vedrebbe qui anche i compagni dell'altro. Questa schermata
+  // parla di una lega sola, quindi si tiene solo chi ne fa parte.
+  const { data: members } = await supabase
+    .from("league_members")
+    .select("player_id, display_name")
+    .eq("league_id", leagueId);
+
+  const iscritti = new Set((members ?? []).map((m) => m.player_id as string));
+  const predictions = (tuttiPronostici ?? []).filter((p) =>
+    iscritti.has(p.player_id as string),
+  );
+
   // I nomi servono solo a giornata bloccata, quando si vedono i pronostici
-  // di tutti. Prima del lock non c'è niente da etichettare.
-  let names: Record<string, string> = {};
-  if (isLocked) {
-    const { data: members } = await supabase
-      .from("league_members")
-      .select("player_id, display_name")
-      .eq("league_id", leagueId);
-    names = Object.fromEntries(
-      (members ?? []).map((m) => [m.player_id as string, m.display_name as string]),
-    );
-  }
+  // di tutti. Prima non c'è niente da etichettare.
+  const names: Record<string, string> = isLocked
+    ? Object.fromEntries(
+        (members ?? []).map((m) => [
+          m.player_id as string,
+          m.display_name as string,
+        ]),
+      )
+    : {};
 
   return NextResponse.json({
     matchday,
@@ -89,7 +100,7 @@ export async function GET(request: Request) {
     isOpen,
     opensAt,
     matches: matches ?? [],
-    predictions: predictions ?? [],
+    predictions,
     names,
     me: auth.session.playerId,
   });
@@ -193,14 +204,13 @@ export async function POST(request: Request) {
     .from("predictions")
     .upsert(
       predictions.map((p) => ({
-        league_id: leagueId,
         player_id: auth.session.playerId,
         match_id: p.matchId,
         home_goals: p.homeGoals,
         away_goals: p.awayGoals,
         updated_at: new Date().toISOString(),
       })),
-      { onConflict: "league_id,player_id,match_id" },
+      { onConflict: "player_id,match_id" },
     )
     .select("match_id");
 

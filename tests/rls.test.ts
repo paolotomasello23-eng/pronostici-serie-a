@@ -268,6 +268,36 @@ describe.skipIf(!canRun)("policy RLS sui pronostici", () => {
     expect(ids).toContain(playerB);
   });
 
+  it("un giocatore ha un solo pronostico per partita, in qualunque lega", async () => {
+    // Il pronostico appartiene alla persona: due righe per la stessa
+    // partita significherebbero poter dire 2-1 in una lega e 1-1 in
+    // un'altra, che non è come funziona il gioco.
+    //
+    // La lega qui è deliberatamente diversa da quella della riga già
+    // esistente: col vecchio vincolo — lega più giocatore più partita —
+    // questo inserimento sarebbe passato, e il test avrebbe dato ragione
+    // a un database sbagliato.
+    const { error } = await admin.from("predictions").insert({
+      league_id: null,
+      player_id: playerA,
+      match_id: openMatchId,
+      home_goals: 4,
+      away_goals: 4,
+    });
+
+    expect(error).not.toBeNull();
+    expect(error!.message.toLowerCase()).toMatch(/duplicat|unique/);
+
+    // E quello di prima è rimasto intatto.
+    const { data } = await admin
+      .from("predictions")
+      .select("home_goals, away_goals")
+      .eq("player_id", playerA)
+      .eq("match_id", openMatchId);
+
+    expect(data).toHaveLength(1);
+  });
+
   it("nessuno può cancellare un pronostico", async () => {
     await asA
       .from("predictions")

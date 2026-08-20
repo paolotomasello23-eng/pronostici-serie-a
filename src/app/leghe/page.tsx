@@ -25,7 +25,9 @@ export default function LeghePage() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [username, setUsername] = useState("");
   const [adding, setAdding] = useState(false);
+  const [creating, setCreating] = useState(false);
   const [inviteCode, setInviteCode] = useState("");
+  const [leagueName, setLeagueName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -76,6 +78,26 @@ export default function LeghePage() {
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error ?? "Ingresso non riuscito.");
+      router.push("/");
+      router.refresh();
+    } catch (e) {
+      setError((e as Error).message);
+      setBusy(false);
+    }
+  }
+
+  async function crea(event: React.FormEvent) {
+    event.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/leagues/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: leagueName }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error ?? "Creazione non riuscita.");
       router.push("/");
       router.refresh();
     } catch (e) {
@@ -174,14 +196,62 @@ export default function LeghePage() {
             Annulla
           </button>
         </form>
-      ) : (
-        <button
-          onClick={() => setAdding(true)}
-          className="flex items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-300 px-5 py-4 font-semibold text-slate-600 active:bg-slate-100"
+      ) : creating ? (
+        <form
+          onSubmit={crea}
+          className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4"
         >
-          <span className="text-2xl leading-none">+</span>
-          Entra in una nuova lega
-        </button>
+          <label className="flex flex-col gap-2">
+            <span className="font-medium">Nome della lega</span>
+            <input
+              value={leagueName}
+              onChange={(e) => setLeagueName(e.target.value)}
+              maxLength={60}
+              minLength={2}
+              autoFocus
+              placeholder="Es. Fantacalcio del bar"
+              className="rounded-xl border border-slate-300 px-4 py-4 text-lg"
+              required
+            />
+          </label>
+          <p className="text-sm text-slate-500">
+            Ne diventi l&apos;amministratore e ricevi un codice da mandare agli
+            amici.
+          </p>
+          <button
+            type="submit"
+            disabled={busy}
+            className="rounded-xl bg-slate-900 px-5 py-4 font-semibold text-white disabled:opacity-50"
+          >
+            {busy ? "Un attimo…" : "Crea la lega"}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setCreating(false);
+              setError(null);
+            }}
+            className="text-sm text-slate-500 underline"
+          >
+            Annulla
+          </button>
+        </form>
+      ) : (
+        <div className="flex flex-col gap-3">
+          <button
+            onClick={() => setAdding(true)}
+            className="flex items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-300 px-5 py-4 font-semibold text-slate-600 active:bg-slate-100"
+          >
+            <span className="text-2xl leading-none">+</span>
+            Entra in una nuova lega
+          </button>
+          <button
+            onClick={() => setCreating(true)}
+            className="rounded-2xl border-2 border-dashed border-slate-300 px-5 py-4 font-semibold text-slate-600 active:bg-slate-100"
+          >
+            Crea una nuova lega
+          </button>
+        </div>
       )}
 
       <a href="/esci" className="mt-2 text-center text-sm text-slate-500 underline">
