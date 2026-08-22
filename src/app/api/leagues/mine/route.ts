@@ -89,7 +89,7 @@ export async function POST(request: Request) {
     }
     if (message.includes("LEAGUE_FULL")) {
       return NextResponse.json(
-        { error: "La lega è al completo (10 giocatori)." },
+        { error: "La lega non accetta altri giocatori." },
         { status: 409 },
       );
     }

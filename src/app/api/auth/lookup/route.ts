@@ -44,6 +44,5 @@ export async function POST(request: Request) {
   return NextResponse.json({
     leagueName: league.name,
     members: (members ?? []).map((m) => m.display_name as string),
-    isFull: (members ?? []).length >= 10,
   });
 }
