@@ -77,9 +77,20 @@ export async function notifyResults(
   const puntiGiornata = new Map(diGiornata.map((r) => [r.playerId, r.points]));
   const posizione = new Map(generale.map((r) => [r.playerId, r.rank]));
 
+  // Chi aveva già ricevuto la notifica quando ne partiva una sola per
+  // giornata (chiave "risultati", senza lega) non la riceve di nuovo.
+  const { data: vecchie } = await admin
+    .from("push_reminders")
+    .select("player_id")
+    .eq("matchday_id", matchdayId)
+    .eq("kind", "risultati");
+  const giaAvvisati = new Set((vecchie ?? []).map((r) => r.player_id as string));
+
   let inviate = 0;
 
   for (const player of players) {
+    if (giaAvvisati.has(player.playerId)) continue;
+
     const punti = puntiGiornata.get(player.playerId) ?? 0;
     const posto = posizione.get(player.playerId) ?? players.length;
 
@@ -109,6 +120,9 @@ export async function notifyResults(
   return inviate;
 }
 
+/** Oltre questo tempo dall'ultima partita, i risultati non sono più una notizia. */
+const NOTIFICA_MAX_ORE = 48;
+
 /**
  * Avvisa tutte le leghe ricalcolate, se la giornata è chiusa.
  *
@@ -126,6 +140,19 @@ export async function notifyIfComplete(
   if (!scored.complete) return 0;
 
   try {
+    // Solo per una giornata appena finita. Ricalcolare a mano una giornata
+    // di settimane fa non deve far arrivare a tutti "Giornata 3: 7 punti"
+    // come se fosse una notizia.
+    const { data: ultima } = await admin
+      .from("matches")
+      .select("kickoff_at")
+      .eq("matchday_id", scored.matchdayId)
+      .order("kickoff_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const ultimoCalcio = ultima ? new Date(ultima.kickoff_at as string).getTime() : 0;
+    if (Date.now() - ultimoCalcio > NOTIFICA_MAX_ORE * 3_600_000) return 0;
+
     const { data: day, error } = await admin
       .from("matchdays")
       .select("number, season")
