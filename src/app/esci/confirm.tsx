@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { unbindSubscription } from "@/components/push-sync";
 
 /**
  * Conferma di uscita.
@@ -17,6 +18,9 @@ export function ExitConfirm({ displayName }: { displayName: string }) {
 
   async function exit() {
     setBusy(true);
+    // Prima di uscire si stacca il dispositivo: chi usa questo telefono dopo
+    // di te non deve ricevere i tuoi promemoria. Se rientri, si riattacca.
+    await unbindSubscription().catch(() => undefined);
     await fetch("/api/auth/logout", { method: "POST" });
     router.push("/entra");
     router.refresh();
@@ -28,7 +32,7 @@ export function ExitConfirm({ displayName }: { displayName: string }) {
         <h1 className="text-2xl font-bold tracking-tight">Vuoi uscire?</h1>
         <p className="mt-2 text-slate-600">
           Stai uscendo come <strong>{displayName}</strong>. Per rientrare ti
-          serviranno il codice della lega e il tuo PIN.
+          serviranno il tuo nome utente e il PIN.
         </p>
       </div>
 

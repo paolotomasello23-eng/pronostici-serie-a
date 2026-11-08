@@ -61,6 +61,17 @@ function teamName(m: Match, side: "home" | "away"): string {
     : (m.away_team_short ?? m.away_team);
 }
 
+/** Solo i pronostici completi: un gol di casa senza l'altro non si salva. */
+function completi(current: Draft) {
+  return Object.entries(current)
+    .filter(([, v]) => v.home !== "" && v.away !== "")
+    .map(([matchId, v]) => ({
+      matchId,
+      homeGoals: Number(v.home),
+      awayGoals: Number(v.away),
+    }));
+}
+
 export function PronosticiForm({
   matchdayId,
   giornate,
@@ -74,7 +85,16 @@ export function PronosticiForm({
   const [draft, setDraft] = useState<Draft>({});
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [error, setError] = useState<string | null>(null);
+
+  // Lo stato vero del salvataggio vive in ref e non in state: serve leggerlo
+  // dentro i timer e dagli eventi di chiusura pagina, dove lo state di React
+  // sarebbe una fotografia vecchia.
+  const draftRef = useRef<Draft>({});
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Un salvataggio è in viaggio. */
+  const inFlight = useRef(false);
+  /** Qualcosa è cambiato dopo l'ultimo invio, e va mandato. */
+  const dirty = useRef(false);
 
   const load = useCallback(async () => {
     const r = await fetch(`/api/predictions?matchdayId=${matchdayId}`);
@@ -90,6 +110,7 @@ export function PronosticiForm({
         mine[p.match_id] = { home: String(p.home_goals), away: String(p.away_goals) };
       }
     }
+    draftRef.current = mine;
     setDraft(mine);
   }, [matchdayId]);
 
@@ -97,20 +118,28 @@ export function PronosticiForm({
     void load();
   }, [load]);
 
-  const save = useCallback(
-    async (current: Draft) => {
-      // Solo i pronostici completi: se hai scritto il gol di casa e stai
-      // ancora pensando all'altro, non c'è niente da salvare.
-      const ready = Object.entries(current)
-        .filter(([, v]) => v.home !== "" && v.away !== "")
-        .map(([matchId, v]) => ({
-          matchId,
-          homeGoals: Number(v.home),
-          awayGoals: Number(v.away),
-        }));
+  /**
+   * Manda tutti i pronostici completi.
+   *
+   * Uno alla volta: con due invii sovrapposti su una rete lenta, il più
+   * vecchio poteva arrivare dopo il più nuovo e riscrivere un risultato già
+   * corretto — mentre la schermata diceva "Salvato". Se qualcosa cambia
+   * mentre un invio è in viaggio, si riparte appena torna, con i valori
+   * aggiornati.
+   */
+  const flush = useCallback(async () => {
+    if (inFlight.current) return;
+    if (timer.current) {
+      clearTimeout(timer.current);
+      timer.current = null;
+    }
 
-      if (ready.length === 0) return;
+    while (dirty.current) {
+      dirty.current = false;
+      const ready = completi(draftRef.current);
+      if (ready.length === 0) break;
 
+      inFlight.current = true;
       setSaveState("saving");
       setError(null);
       try {
@@ -119,29 +148,65 @@ export function PronosticiForm({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ predictions: ready }),
         });
-        const d = await r.json();
+        const d = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(d.error ?? "Salvataggio fallito.");
-        setSaveState("saved");
+        if (!dirty.current) setSaveState("saved");
       } catch (e) {
         setSaveState("error");
         setError((e as Error).message);
+        inFlight.current = false;
+        // Resta da mandare: ci si riprova alla prossima modifica, o quando
+        // si esce dalla pagina.
+        dirty.current = true;
+        return;
       }
-    },
-    [],
-  );
+      inFlight.current = false;
+    }
+  }, []);
+
+  // Chi scrive l'ultimo risultato e chiude subito l'app, o tocca un'altra
+  // voce del menu, non deve perderlo: l'attesa di 800 ms si salta e si
+  // spedisce quello che c'è, con una richiesta che sopravvive alla pagina.
+  useEffect(() => {
+    function spedisciSubito() {
+      if (!dirty.current) return;
+      const ready = completi(draftRef.current);
+      if (ready.length === 0) return;
+      if (timer.current) clearTimeout(timer.current);
+      timer.current = null;
+      dirty.current = false;
+      void fetch("/api/predictions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ predictions: ready }),
+        keepalive: true,
+      });
+    }
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") spedisciSubito();
+    };
+    window.addEventListener("pagehide", spedisciSubito);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("pagehide", spedisciSubito);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
 
   function update(matchId: string, side: "home" | "away", value: string) {
     const clean = value.replace(/\D/g, "").slice(0, 2);
-    setDraft((prev) => {
-      const current = prev[matchId] ?? { home: "", away: "" };
-      const next = {
-        ...prev,
-        [matchId]: { ...current, [side]: clean },
-      };
-      if (timer.current) clearTimeout(timer.current);
-      timer.current = setTimeout(() => void save(next), 800);
-      return next;
-    });
+    // Oltre 20 il server rifiuta, e rifiutava l'intero invio: un "25"
+    // digitato per sbaglio bloccava il salvataggio di tutte le partite.
+    if (clean !== "" && Number(clean) > 20) return;
+
+    const current = draftRef.current[matchId] ?? { home: "", away: "" };
+    const next = { ...draftRef.current, [matchId]: { ...current, [side]: clean } };
+    draftRef.current = next;
+    setDraft(next);
+
+    dirty.current = true;
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => void flush(), 800);
   }
 
   if (error && !data) {
@@ -194,6 +259,9 @@ export function PronosticiForm({
           lockAt={data.matchday.lock_at}
           compiled={compiled}
           total={data.matches.length}
+          // Allo scoccare del blocco la schermata passa da sola ai pronostici
+          // di tutti, invece di lasciare caselle che non salvano più.
+          onExpire={() => void load()}
         />
       )}
 

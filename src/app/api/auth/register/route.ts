@@ -43,10 +43,17 @@ export async function POST(request: Request) {
   const ingresso = creazione.success ? null : schemaIngresso.safeParse(corpo);
 
   if (!creazione.success && !ingresso?.success) {
+    // Chi crea una lega può sbagliare anche il nome della lega: dirgli che
+    // è il nome utente a non andare lo manderebbe a correggere la cosa
+    // sbagliata.
+    const legaNonValida =
+      corpo?.mode === "create" &&
+      creazione.error.issues.some((i) => i.path[0] === "leagueName");
     return NextResponse.json(
       {
-        error:
-          "Nome utente non valido: da 2 a 20 caratteri, senza spazi né simboli.",
+        error: legaNonValida
+          ? "Il nome della lega deve avere da 2 a 60 caratteri."
+          : "Nome utente non valido: da 2 a 20 caratteri, senza spazi né simboli.",
       },
       { status: 400 },
     );
@@ -90,7 +97,10 @@ export async function POST(request: Request) {
     }
     if (message.includes("USERNAME_TAKEN")) {
       return NextResponse.json(
-        { error: "Questo nome utente è già preso. Scegline un altro." },
+        {
+          error:
+            "Questo nome utente è già preso. Scegline un altro — o, se è il tuo, torna indietro e scegli «Ho già un account».",
+        },
         { status: 409 },
       );
     }

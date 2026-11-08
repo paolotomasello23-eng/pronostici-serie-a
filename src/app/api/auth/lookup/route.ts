@@ -6,12 +6,8 @@ import { normalizeInviteCode } from "@/lib/leagues";
 const schema = z.object({ inviteCode: z.string().min(1).max(20) });
 
 /**
- * Dato il codice d'invito, restituisce il nome della lega e chi ne fa già
- * parte, così al passo dopo si sceglie il proprio nome da una lista invece
- * di digitarlo (e sbagliarlo).
- *
- * Non espone nulla di riservato: i nomi dei membri li vede solo chi ha già
- * il codice, cioè chi è stato invitato.
+ * Dato il codice d'invito, restituisce il nome della lega: la schermata di
+ * ingresso lo usa per confermare il codice prima di chiedere nome e PIN.
  */
 export async function POST(request: Request) {
   const parsed = schema.safeParse(await request.json().catch(() => null));
@@ -35,14 +31,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const { data: members } = await admin
-    .from("league_members")
-    .select("display_name")
-    .eq("league_id", league.id)
-    .order("display_name");
-
-  return NextResponse.json({
-    leagueName: league.name,
-    members: (members ?? []).map((m) => m.display_name as string),
-  });
+  // Solo il nome della lega: basta a confermare di aver scritto il codice
+  // giusto, e i nomi dei membri non servono a nessuna schermata.
+  return NextResponse.json({ leagueName: league.name });
 }

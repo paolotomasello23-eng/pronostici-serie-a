@@ -28,6 +28,7 @@ export default function EntraPage() {
   const [pin, setPin] = useState("");
   const [pinConfirm, setPinConfirm] = useState("");
   const [codiceCreato, setCodiceCreato] = useState<string | null>(null);
+  const [nomeLegaInvito, setNomeLegaInvito] = useState<string | null>(null);
 
   function indietro() {
     setError(null);
@@ -57,7 +58,15 @@ export default function EntraPage() {
         body: JSON.stringify(body),
       });
       const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error ?? "Iscrizione non riuscita.");
+      if (!response.ok) {
+        // Un nome già preso non c'entra con il PIN: farlo riscrivere due
+        // volte sarebbe solo una punizione.
+        if (response.status !== 409) {
+          setPin("");
+          setPinConfirm("");
+        }
+        throw new Error(data.error ?? "Iscrizione non riuscita.");
+      }
 
       // Chi ha appena creato la lega deve vedere il codice da mandare agli
       // amici: portarlo dentro senza mostrarglielo lo costringerebbe a
@@ -71,8 +80,32 @@ export default function EntraPage() {
       router.refresh();
     } catch (e) {
       setError((e as Error).message);
-      setPin("");
-      setPinConfirm("");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /**
+   * Il codice si controlla subito, prima di chiedere nome e PIN: scoprire
+   * che era sbagliato solo alla fine, dopo aver scelto tutto, voleva dire
+   * ricominciare da capo.
+   */
+  async function verificaCodice(event: React.FormEvent) {
+    event.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/auth/lookup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ inviteCode }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error ?? "Codice non riconosciuto.");
+      setNomeLegaInvito(data.leagueName ?? null);
+      setPasso("credenziali");
+    } catch (e) {
+      setError((e as Error).message);
     } finally {
       setBusy(false);
     }
@@ -136,7 +169,10 @@ export default function EntraPage() {
           {passo === "scelta" && "Pronostici di Serie A tra amici."}
           {passo === "codice" && "Inserisci il codice che ti hanno mandato."}
           {passo === "nomeLega" && "Come si chiama la tua lega?"}
-          {passo === "credenziali" && "Scegli come ti chiamerai."}
+          {passo === "credenziali" &&
+            (strada === "join" && nomeLegaInvito
+              ? `Entri in ${nomeLegaInvito}. Scegli come ti chiamerai.`
+              : "Scegli come ti chiamerai.")}
           {passo === "login" && "Entra con il tuo nome utente."}
         </p>
       </header>
@@ -176,13 +212,7 @@ export default function EntraPage() {
       )}
 
       {passo === "codice" && (
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            setPasso("credenziali");
-          }}
-          className="flex flex-col gap-4"
-        >
+        <form onSubmit={verificaCodice} className="flex flex-col gap-4">
           <label className="flex flex-col gap-2">
             <span className="font-medium">Codice della lega</span>
             <input
@@ -196,7 +226,7 @@ export default function EntraPage() {
               required
             />
           </label>
-          <Bottone>Continua</Bottone>
+          <Bottone busy={busy}>Continua</Bottone>
           <Indietro onClick={indietro} />
         </form>
       )}

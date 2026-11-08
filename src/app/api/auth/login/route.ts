@@ -26,12 +26,13 @@ export async function POST(request: Request) {
   const admin = serviceClient();
 
   // Confronto senza distinzione tra maiuscole e minuscole, come l'indice
-  // che garantisce l'unicità. `ilike` qui è al sicuro: lo username è
-  // ripulito da zod e i caratteri jolly non superano la validazione.
+  // che garantisce l'unicità. I caratteri jolly di `ilike` vanno disattivati:
+  // "_" è ammesso nei nomi utente, e senza escape "tom_x" troverebbe anche
+  // "tomax". Il confronto esatto più sotto resta come seconda garanzia.
   const { data: players } = await admin
     .from("players")
     .select("id, username")
-    .ilike("username", username);
+    .ilike("username", username.replace(/[\\%_]/g, (c) => `\\${c}`));
 
   const player = (players ?? []).find(
     (p) =>
