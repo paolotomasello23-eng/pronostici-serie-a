@@ -26,6 +26,8 @@ export interface ApplyResult {
   updated: number;
   lockAt: string | null;
   lockedAlready: boolean;
+  /** Qualche partita è nuova, o ha cambiato stato o risultato. */
+  resultsChanged: boolean;
 }
 
 export async function applyMatchday(
@@ -39,12 +41,14 @@ export async function applyMatchday(
 ): Promise<ApplyResult> {
   const { season, number, inputs, source } = params;
 
-  const { data: existingDay } = await admin
+  const { data: existingDay, error: dayError } = await admin
     .from("matchdays")
     .select("id, lock_at, status")
     .eq("season", season)
     .eq("number", number)
     .maybeSingle();
+
+  if (dayError) throw new Error(`Giornata non leggibile: ${dayError.message}`);
 
   let matchdayId = existingDay?.id as string | undefined;
 
@@ -69,18 +73,27 @@ export async function applyMatchday(
   const lockedAlready =
     !!previousLockAt && new Date(previousLockAt).getTime() <= Date.now();
 
-  const { data: existingMatches } = await admin
+  const { data: existingMatches, error: existingError } = await admin
     .from("matches")
-    .select("id, external_id")
+    .select("id, external_id, status, home_goals, away_goals")
     .eq("matchday_id", matchdayId);
 
+  if (existingError) {
+    throw new Error(`Partite esistenti non leggibili: ${existingError.message}`);
+  }
+
   const byExternalId = new Map<string, string>();
+  const before = new Map<string, string>();
   for (const row of existingMatches ?? []) {
     if (row.external_id) byExternalId.set(String(row.external_id), row.id as string);
+    before.set(row.id as string, `${row.status}|${row.home_goals}|${row.away_goals}`);
   }
 
   let inserted = 0;
   let updated = 0;
+  // Se qualche risultato cambia, i punti vanno rifatti: lo diciamo a chi
+  // chiama lasciando la giornata da ricalcolare invece che "chiusa".
+  let resultsChanged = false;
 
   for (const [index, input] of inputs.entries()) {
     const { homeGoals, awayGoals } = usableGoals(input);
@@ -121,10 +134,14 @@ export async function applyMatchday(
 
       const { error } = await admin.from("matches").update(row).eq("id", targetId);
       if (error) throw new Error(`Aggiornamento partita fallito: ${error.message}`);
+      if (before.get(targetId) !== `${status}|${homeGoals}|${awayGoals}`) {
+        resultsChanged = true;
+      }
       updated++;
     } else {
       const { error } = await admin.from("matches").insert(row);
       if (error) throw new Error(`Inserimento partita fallito: ${error.message}`);
+      resultsChanged = true;
       inserted++;
     }
   }
@@ -154,17 +171,24 @@ export async function applyMatchday(
         })),
       );
 
-  const allFinished =
-    (allMatches ?? []).length > 0 &&
-    (allMatches ?? []).every((m) => m.status === "FINISHED");
-
-  const dayStatus = allFinished
-    ? "scored"
-    : lockAt && new Date(lockAt).getTime() <= Date.now()
-      ? "locked"
-      : (allMatches ?? []).length > 0
-        ? "open"
-        : "draft";
+  // 'scored' non si assegna mai da qui: vuol dire "punti già calcolati per
+  // tutte le leghe", e questa funzione scrive il calendario, non i punti.
+  // Quando lo faceva, bastava che il sync del calendario passasse prima del
+  // controllo dei risultati perché la giornata risultasse chiusa senza che
+  // nessuno avesse assegnato i punti delle ultime partite — e il controllo
+  // non ci tornava più sopra.
+  //
+  // Se invece era già chiusa e non è cambiato niente, resta chiusa: niente
+  // ricalcoli e niente notifiche a vuoto a ogni passaggio del calendario.
+  const previousStatus = existingDay?.status as string | undefined;
+  const dayStatus =
+    previousStatus === "scored" && !resultsChanged
+      ? "scored"
+      : lockAt && new Date(lockAt).getTime() <= Date.now()
+        ? "locked"
+        : (allMatches ?? []).length > 0
+          ? "open"
+          : "draft";
 
   await admin
     .from("matchdays")
@@ -176,7 +200,7 @@ export async function applyMatchday(
     })
     .eq("id", matchdayId);
 
-  return { matchdayId, inserted, updated, lockAt, lockedAlready };
+  return { matchdayId, inserted, updated, lockAt, lockedAlready, resultsChanged };
 }
 
 /** Traccia ogni sincronizzazione, per poterla ricostruire quando qualcosa non torna. */
