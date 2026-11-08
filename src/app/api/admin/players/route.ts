@@ -2,7 +2,78 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/auth/guards";
 import { serviceClient } from "@/lib/supabase/server";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 import { hashPin, isValidPinFormat, PIN_LENGTH } from "@/lib/auth/pin";
+
+/**
+ * Chi può ricevere un PIN nuovo da chi.
+ *
+ * L'account è uno solo per tutte le leghe: chi ne ricava il PIN entra
+ * ovunque quella persona giochi. Da quando chiunque può creare una lega,
+ * lasciare questo potere a ogni admin di lega voleva dire che bastava farsi
+ * aggiungere un amico al proprio gruppo per potergli prendere l'account —
+ * leghe altrui comprese.
+ *
+ * Quindi: l'admin di una lega può reimpostarlo solo a chi gioca soltanto
+ * in leghe che amministra lui. Per tutti gli altri serve l'admin dell'app.
+ */
+async function resettablePlayers(
+  admin: ReturnType<typeof serviceClient>,
+  requesterId: string,
+  playerIds: string[],
+): Promise<Set<string>> {
+  if (playerIds.length === 0) return new Set();
+
+  const [memberships, mine, appAdmins] = await Promise.all([
+    // A gruppi: gli id finiscono nell'indirizzo della richiesta, e una lega
+    // di qualche centinaio di persone ne supererebbe la lunghezza massima.
+    Promise.all(
+      chunks(playerIds, 100).map((gruppo) =>
+        fetchAll<Record<string, unknown>>((from, to) =>
+          admin
+            .from("league_members")
+            .select("league_id, player_id")
+            .in("player_id", gruppo)
+            .order("league_id")
+            .order("player_id")
+            .range(from, to),
+        ),
+      ),
+    ).then((parti) => parti.flat()),
+    admin
+      .from("league_members")
+      .select("league_id")
+      .eq("player_id", requesterId)
+      .eq("role", "admin"),
+    // Gli admin dell'app sono uno o due: si leggono tutti, senza filtri.
+    admin.from("players").select("id").eq("is_app_admin", true),
+  ]);
+
+  const amministrate = new Set((mine.data ?? []).map((r) => r.league_id as string));
+  // Se la colonna non c'è ancora la lettura fallisce: nel dubbio, nessuno.
+  const protetti = appAdmins.error
+    ? new Set(playerIds)
+    : new Set((appAdmins.data ?? []).map((r) => r.id as string));
+
+  const fuoriPortata = new Set<string>();
+  for (const row of memberships) {
+    if (!amministrate.has(row.league_id as string)) {
+      fuoriPortata.add(row.player_id as string);
+    }
+  }
+
+  return new Set(
+    playerIds.filter(
+      (id) => id === requesterId || (!protetti.has(id) && !fuoriPortata.has(id)),
+    ),
+  );
+}
+
+function chunks<T>(items: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
+}
 
 /** I giocatori della lega, con lo stato dell'accesso. */
 export async function GET() {
@@ -21,14 +92,23 @@ export async function GET() {
 
   const ids = (members ?? []).map((m) => m.player_id as string);
 
-  const { data: players } = ids.length
-    ? await admin
-        .from("players")
-        .select("id, username, failed_attempts, locked_until")
-        .in("id", ids)
-    : { data: [] };
+  const players = (
+    await Promise.all(
+      chunks(ids, 100).map(async (gruppo) => {
+        const { data } = await admin
+          .from("players")
+          .select("id, username, failed_attempts, locked_until")
+          .in("id", gruppo);
+        return data ?? [];
+      }),
+    )
+  ).flat();
 
-  const byId = new Map((players ?? []).map((p) => [p.id as string, p]));
+  const byId = new Map(players.map((p) => [p.id as string, p]));
+
+  const resettabili = auth.isAppAdmin
+    ? new Set(ids)
+    : await resettablePlayers(admin, auth.session.playerId, ids);
 
   return NextResponse.json({
     players: (members ?? []).map((m) => {
@@ -39,6 +119,7 @@ export async function GET() {
         displayName: m.display_name as string,
         username: (p?.username as string) ?? null,
         isAdmin: m.role === "admin",
+        canResetPin: resettabili.has(m.player_id as string),
         failedAttempts: (p?.failed_attempts as number) ?? 0,
         lockedUntil:
           bloccatoFino && new Date(bloccatoFino) > new Date() ? bloccatoFino : null,
@@ -98,6 +179,19 @@ export async function POST(request: Request) {
       { error: "Questo giocatore non è nella tua lega." },
       { status: 403 },
     );
+  }
+
+  if (!auth.isAppAdmin) {
+    const ammessi = await resettablePlayers(admin, auth.session.playerId, [playerId]);
+    if (!ammessi.has(playerId)) {
+      return NextResponse.json(
+        {
+          error:
+            "Gioca anche in altre leghe: il suo PIN può reimpostarlo solo l'amministratore dell'app.",
+        },
+        { status: 403 },
+      );
+    }
   }
 
   const { error } = await admin

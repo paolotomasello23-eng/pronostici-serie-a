@@ -79,7 +79,8 @@ Le due automazioni:
 | Workflow | Quando | Cosa fa |
 |---|---|---|
 | Calendario | 06:00 e 18:00 UTC | partite e orari, quindi il momento del lock |
-| Risultati | ogni 15 min ven–lun, 16–23 UTC | risultati finali e classifica |
+| Risultati | ogni 15 min ven–lun, 12–23 UTC | risultati finali e classifica |
+| Promemoria | ogni 10 min, 5–23 UTC | apertura, promemoria prima del blocco |
 
 Gli orari nei file sono UTC: l'Italia è avanti di un'ora d'inverno e due
 d'estate.
@@ -103,6 +104,21 @@ cambia niente.
 **Se football-data non risponde**, resta il pannello admin: inserisci
 risultati a mano e premi *Ricalcola e basta*. È il motivo per cui automatico
 e manuale passano dalla stessa strada.
+
+## Chi amministra cosa
+
+Calendario e risultati sono uno solo per tutte le leghe, quindi li gestisce
+solo l'**amministratore dell'app** (colonna `players.is_app_admin`). La
+migrazione 0015 assegna il ruolo a chi ha creato la prima lega. Per darlo a
+qualcun altro, dall'SQL Editor:
+
+```sql
+update players set is_app_admin = true where lower(username) = 'nome';
+```
+
+L'admin di una lega — cioè chiunque ne crei una — gestisce solo i giocatori
+della propria: può dare un PIN nuovo a chi gioca soltanto nelle sue leghe.
+Per chi è anche in leghe altrui serve l'amministratore dell'app.
 
 ## Aggiornare l'app
 

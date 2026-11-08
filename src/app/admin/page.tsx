@@ -10,7 +10,9 @@ interface MatchRow {
   id: string | null;
   external_id: string | null;
   home_team: string;
+  home_team_short?: string | null;
   away_team: string;
+  away_team_short?: string | null;
   kickoff_at: string;
   status: MatchStatus;
   home_goals: number | null;
@@ -22,6 +24,8 @@ interface PlayerRow {
   displayName: string;
   username: string | null;
   isAdmin: boolean;
+  /** Se chi guarda può assegnargli un PIN nuovo. */
+  canResetPin: boolean;
   failedAttempts: number;
   lockedUntil: string | null;
 }
@@ -61,6 +65,9 @@ export default function AdminPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [players, setPlayers] = useState<PlayerRow[]>([]);
+  // Calendario e risultati sono di tutte le leghe: li gestisce solo l'admin
+  // dell'app. Finché non si sa, non si mostra niente.
+  const [canManageCalendar, setCanManageCalendar] = useState<boolean | null>(null);
 
   const loadPlayers = useCallback(async () => {
     const r = await fetch("/api/admin/players");
@@ -81,8 +88,11 @@ export default function AdminPage() {
           setError("Non sei l'amministratore di questa lega.");
           return;
         }
-        setSeason(d.season);
-        setNumber(d.currentMatchday ?? 1);
+        setCanManageCalendar(d.canManageCalendar === true);
+        if (d.canManageCalendar) {
+          setSeason(d.season);
+          setNumber(d.currentMatchday ?? 1);
+        }
       })
       .catch(() => setError("Impossibile contattare il server."));
   }, []);
@@ -145,7 +155,7 @@ export default function AdminPage() {
 
 ` +
         "Il PIN attuale non è recuperabile: questo lo sostituisce. " +
-        "Comunicaglielo tu, e digli di cambiarlo appena entra.",
+        "Comunicaglielo tu, e digli di cambiarlo dal suo profilo appena entra.",
     );
     if (pin === null) return;
 
@@ -232,7 +242,7 @@ export default function AdminPage() {
       if (!r.ok) throw new Error(d.error ?? "Errore");
       setMessage(
         `${label}: ${d.finishedMatches} partite finite su ${d.totalMatches}, ` +
-          `${d.scoredRows} punteggi scritti.` +
+          `${d.scoredRows} punteggi scritti in ${d.leagues} leghe.` +
           (d.complete ? " Giornata completa." : " Giornata ancora aperta: mancano dei risultati."),
       );
       await load();
@@ -258,7 +268,9 @@ export default function AdminPage() {
             id: m.id,
             externalId: m.external_id,
             homeTeam: m.home_team,
+            homeTeamShort: m.home_team_short ?? null,
             awayTeam: m.away_team,
+            awayTeamShort: m.away_team_short ?? null,
             kickoffAt: m.kickoff_at,
             status: m.status,
             homeGoals: m.status === "FINISHED" ? (m.home_goals ?? 0) : null,
@@ -268,7 +280,11 @@ export default function AdminPage() {
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error ?? "Errore");
-      setMessage("Salvato.");
+      setMessage(
+        d.scored
+          ? `Salvato. Punteggi ricalcolati in tutte le leghe${d.scored.complete ? ": giornata completa." : "."}`
+          : "Salvato.",
+      );
       await load();
     } catch (e) {
       setError((e as Error).message);
@@ -326,8 +342,9 @@ export default function AdminPage() {
       <header className="pt-4">
         <h1 className="text-2xl font-bold tracking-tight">Pannello admin</h1>
         <p className="text-sm text-slate-500">
-          Calendario delle giornate: automatico, con correzione a mano sempre
-          disponibile.
+          {canManageCalendar
+            ? "Giocatori della lega e calendario delle giornate: automatico, con correzione a mano sempre disponibile."
+            : "I giocatori della tua lega."}
         </p>
       </header>
 
@@ -339,193 +356,6 @@ export default function AdminPage() {
           {message}
         </p>
       )}
-
-      <section className="flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200 bg-white p-4">
-        <label className="flex flex-col gap-1">
-          <span className="text-sm font-medium">Stagione</span>
-          <input
-            type="number"
-            value={season ?? ""}
-            onChange={(e) => setSeason(Number(e.target.value))}
-            className="w-28 rounded-lg border border-slate-300 px-3 py-2"
-          />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-sm font-medium">Giornata</span>
-          <input
-            type="number"
-            min={1}
-            max={38}
-            value={number}
-            onChange={(e) => setNumber(Number(e.target.value))}
-            className="w-24 rounded-lg border border-slate-300 px-3 py-2"
-          />
-        </label>
-        <button
-          onClick={sync}
-          disabled={busy || season === null}
-          className="rounded-xl bg-slate-900 px-4 py-3 font-semibold text-white disabled:opacity-50"
-        >
-          Scarica calendario
-        </button>
-      </section>
-
-      <section className="flex flex-wrap gap-3 rounded-2xl border border-slate-200 bg-white p-4">
-        <div className="w-full">
-          <h2 className="font-semibold">Risultati e punteggi</h2>
-          <p className="text-sm text-slate-500">
-            Il bonus &quot;unico&quot; dipende dai pronostici di tutti, quindi
-            ogni ricalcolo rifà i conti dell&apos;intera giornata.
-          </p>
-        </div>
-        <button
-          onClick={syncResults}
-          disabled={busy || season === null}
-          className="rounded-xl bg-slate-900 px-4 py-3 font-semibold text-white disabled:opacity-50"
-        >
-          Scarica risultati e ricalcola
-        </button>
-        <button
-          onClick={recompute}
-          disabled={busy || season === null}
-          className="rounded-xl border border-slate-300 px-4 py-3 font-semibold disabled:opacity-50"
-        >
-          Ricalcola e basta
-        </button>
-      </section>
-
-      {matchday && (
-        <section className="rounded-2xl border border-slate-200 bg-white p-4 text-sm">
-          <div className="flex flex-wrap gap-x-6 gap-y-1">
-            <span>
-              Stato: <strong>{matchday.status}</strong>
-            </span>
-            <span>
-              Fonte: <strong>{matchday.source}</strong>
-            </span>
-            <span>
-              Lock:{" "}
-              <strong>
-                {matchday.lock_at ? formatRome(matchday.lock_at) : "non definito"}
-              </strong>
-            </span>
-          </div>
-          {locked && (
-            <div className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-amber-900">
-              <p>
-                Giornata bloccata: i pronostici non sono più modificabili e il
-                lock non verrà ricalcolato, nemmeno se cambiano gli orari.
-              </p>
-              <button
-                onClick={resetLock}
-                disabled={busy}
-                className="mt-2 rounded-lg border border-amber-700 px-3 py-2 text-sm font-semibold disabled:opacity-50"
-              >
-                Riallinea il lock al calcio d&apos;inizio
-              </button>
-              <p className="mt-1 text-xs">
-                Da usare solo se si è bloccata per sbaglio: riapre i pronostici
-                a tutti.
-              </p>
-            </div>
-          )}
-        </section>
-      )}
-
-      <section className="flex flex-col gap-3">
-        <div className="flex items-center justify-between">
-          <h2 className="font-semibold">Partite ({matches.length})</h2>
-          <button onClick={addEmpty} className="text-sm text-slate-600 underline">
-            + Aggiungi partita
-          </button>
-        </div>
-
-        {matches.map((m, i) => (
-          <div
-            key={m.id ?? `nuova-${i}`}
-            className="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-white p-3"
-          >
-            <div className="flex items-center gap-2">
-              <input
-                value={m.home_team}
-                onChange={(e) => update(i, { home_team: e.target.value })}
-                placeholder="Casa"
-                className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2"
-              />
-              <span className="text-slate-400">–</span>
-              <input
-                value={m.away_team}
-                onChange={(e) => update(i, { away_team: e.target.value })}
-                placeholder="Trasferta"
-                className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2"
-              />
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <input
-                type="datetime-local"
-                value={toLocalInput(m.kickoff_at)}
-                onChange={(e) =>
-                  update(i, {
-                    kickoff_at: new Date(e.target.value).toISOString(),
-                  })
-                }
-                className="rounded-lg border border-slate-300 px-3 py-2"
-              />
-              <select
-                value={m.status}
-                onChange={(e) =>
-                  update(i, { status: e.target.value as MatchStatus })
-                }
-                className="rounded-lg border border-slate-300 px-3 py-2"
-              >
-                {["TIMED", "SCHEDULED", "IN_PLAY", "PAUSED", "FINISHED", "POSTPONED", "SUSPENDED", "CANCELLED"].map(
-                  (s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ),
-                )}
-              </select>
-
-              {m.status === "FINISHED" && (
-                <span className="flex items-center gap-1">
-                  <input
-                    type="number"
-                    min={0}
-                    max={20}
-                    value={m.home_goals ?? 0}
-                    onChange={(e) => update(i, { home_goals: Number(e.target.value) })}
-                    className="w-16 rounded-lg border border-slate-300 px-2 py-2 text-center"
-                  />
-                  <span>–</span>
-                  <input
-                    type="number"
-                    min={0}
-                    max={20}
-                    value={m.away_goals ?? 0}
-                    onChange={(e) => update(i, { away_goals: Number(e.target.value) })}
-                    className="w-16 rounded-lg border border-slate-300 px-2 py-2 text-center"
-                  />
-                </span>
-              )}
-
-              <button
-                onClick={() => remove(m.id, i)}
-                className="ml-auto text-sm text-red-700 underline"
-              >
-                Elimina
-              </button>
-            </div>
-          </div>
-        ))}
-
-        {matches.length === 0 && (
-          <p className="rounded-2xl border border-dashed border-slate-300 p-6 text-center text-slate-500">
-            Nessuna partita. Scaricala dall&apos;API o aggiungila a mano.
-          </p>
-        )}
-      </section>
 
       <section className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4">
         <div>
@@ -558,13 +388,19 @@ export default function AdminPage() {
                       : `accede come ${player.username ?? "?"}`}
                 </span>
               </span>
-              <button
-                onClick={() => resetPin(player)}
-                disabled={busy}
-                className="shrink-0 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium disabled:opacity-50"
-              >
-                Nuovo PIN
-              </button>
+              {player.canResetPin ? (
+                <button
+                  onClick={() => resetPin(player)}
+                  disabled={busy}
+                  className="shrink-0 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium disabled:opacity-50"
+                >
+                  Nuovo PIN
+                </button>
+              ) : (
+                <span className="max-w-[9rem] shrink-0 text-right text-xs text-slate-500">
+                  gioca anche in altre leghe: il PIN lo reimposta l&apos;admin dell&apos;app
+                </span>
+              )}
             </li>
           ))}
           {players.length === 0 && (
@@ -573,13 +409,224 @@ export default function AdminPage() {
         </ul>
       </section>
 
-      <button
-        onClick={save}
-        disabled={busy || matches.length === 0}
-        className="sticky bottom-24 z-10 rounded-xl bg-slate-900 px-5 py-4 text-lg font-semibold text-white shadow-lg disabled:opacity-50"
-      >
-        {busy ? "Un attimo…" : "Salva le partite"}
-      </button>
+      {canManageCalendar === false && (
+        <section className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
+          <p className="font-medium text-slate-900">Calendario e risultati</p>
+          <p className="mt-1">
+            Si aggiornano da soli, uguali per tutte le leghe. Se qualcosa non
+            torna, avvisa l&apos;amministratore dell&apos;app.
+          </p>
+        </section>
+      )}
+
+      {canManageCalendar && (
+        <>
+        <section className="flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+          <label className="flex flex-col gap-1">
+            <span className="text-sm font-medium">Stagione</span>
+            <input
+              type="number"
+              value={season ?? ""}
+              onChange={(e) => setSeason(Number(e.target.value))}
+              className="w-28 rounded-lg border border-slate-300 px-3 py-2"
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-sm font-medium">Giornata</span>
+            <input
+              type="number"
+              min={1}
+              max={38}
+              value={number}
+              onChange={(e) => setNumber(Number(e.target.value))}
+              className="w-24 rounded-lg border border-slate-300 px-3 py-2"
+            />
+          </label>
+          <button
+            onClick={sync}
+            disabled={busy || season === null}
+            className="rounded-xl bg-slate-900 px-4 py-3 font-semibold text-white disabled:opacity-50"
+          >
+            Scarica calendario
+          </button>
+        </section>
+
+        <section className="flex flex-wrap gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+          <div className="w-full">
+            <h2 className="font-semibold">Risultati e punteggi</h2>
+            <p className="text-sm text-slate-500">
+              Il bonus &quot;unico&quot; dipende dai pronostici di tutti, quindi
+              ogni ricalcolo rifà i conti dell&apos;intera giornata.
+            </p>
+          </div>
+          <button
+            onClick={syncResults}
+            disabled={busy || season === null}
+            className="rounded-xl bg-slate-900 px-4 py-3 font-semibold text-white disabled:opacity-50"
+          >
+            Scarica risultati e ricalcola
+          </button>
+          <button
+            onClick={recompute}
+            disabled={busy || season === null}
+            className="rounded-xl border border-slate-300 px-4 py-3 font-semibold disabled:opacity-50"
+          >
+            Ricalcola e basta
+          </button>
+        </section>
+
+        {matchday && (
+          <section className="rounded-2xl border border-slate-200 bg-white p-4 text-sm">
+            <div className="flex flex-wrap gap-x-6 gap-y-1">
+              <span>
+                Stato: <strong>{matchday.status}</strong>
+              </span>
+              <span>
+                Fonte: <strong>{matchday.source}</strong>
+              </span>
+              <span>
+                Lock:{" "}
+                <strong>
+                  {matchday.lock_at ? formatRome(matchday.lock_at) : "non definito"}
+                </strong>
+              </span>
+            </div>
+            {locked && (
+              <div className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-amber-900">
+                <p>
+                  Giornata bloccata: i pronostici non sono più modificabili e il
+                  lock non verrà ricalcolato, nemmeno se cambiano gli orari.
+                </p>
+                <button
+                  onClick={resetLock}
+                  disabled={busy}
+                  className="mt-2 rounded-lg border border-amber-700 px-3 py-2 text-sm font-semibold disabled:opacity-50"
+                >
+                  Riallinea il lock al calcio d&apos;inizio
+                </button>
+                <p className="mt-1 text-xs">
+                  Da usare solo se si è bloccata per sbaglio: riapre i pronostici
+                  a tutti.
+                </p>
+              </div>
+            )}
+          </section>
+        )}
+
+        <section className="flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold">Partite ({matches.length})</h2>
+            <button onClick={addEmpty} className="text-sm text-slate-600 underline">
+              + Aggiungi partita
+            </button>
+          </div>
+
+          {matches.map((m, i) => (
+            <div
+              key={m.id ?? `nuova-${i}`}
+              className="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-white p-3"
+            >
+              <div className="flex items-center gap-2">
+                <input
+                  value={m.home_team}
+                  // Un nome riscritto a mano vale anche come nome corto: quello
+                  // vecchio, scaricato dall'API, non corrisponderebbe più.
+                  onChange={(e) =>
+                    update(i, { home_team: e.target.value, home_team_short: null })
+                  }
+                  placeholder="Casa"
+                  className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2"
+                />
+                <span className="text-slate-400">–</span>
+                <input
+                  value={m.away_team}
+                  onChange={(e) =>
+                    update(i, { away_team: e.target.value, away_team_short: null })
+                  }
+                  placeholder="Trasferta"
+                  className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2"
+                />
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  type="datetime-local"
+                  value={toLocalInput(m.kickoff_at)}
+                  onChange={(e) => {
+                    // Un campo svuotato dà una data non valida: meglio ignorarlo
+                    // che far saltare la pagina.
+                    const d = new Date(e.target.value);
+                    if (!Number.isNaN(d.getTime())) {
+                      update(i, { kickoff_at: d.toISOString() });
+                    }
+                  }}
+                  className="rounded-lg border border-slate-300 px-3 py-2"
+                />
+                <select
+                  value={m.status}
+                  onChange={(e) =>
+                    update(i, { status: e.target.value as MatchStatus })
+                  }
+                  className="rounded-lg border border-slate-300 px-3 py-2"
+                >
+                  {["TIMED", "SCHEDULED", "IN_PLAY", "PAUSED", "FINISHED", "POSTPONED", "SUSPENDED", "CANCELLED"].map(
+                    (s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ),
+                  )}
+                </select>
+
+                {m.status === "FINISHED" && (
+                  <span className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      min={0}
+                      max={20}
+                      value={m.home_goals ?? 0}
+                      onChange={(e) => update(i, { home_goals: Number(e.target.value) })}
+                      className="w-16 rounded-lg border border-slate-300 px-2 py-2 text-center"
+                    />
+                    <span>–</span>
+                    <input
+                      type="number"
+                      min={0}
+                      max={20}
+                      value={m.away_goals ?? 0}
+                      onChange={(e) => update(i, { away_goals: Number(e.target.value) })}
+                      className="w-16 rounded-lg border border-slate-300 px-2 py-2 text-center"
+                    />
+                  </span>
+                )}
+
+                <button
+                  onClick={() => remove(m.id, i)}
+                  className="ml-auto text-sm text-red-700 underline"
+                >
+                  Elimina
+                </button>
+              </div>
+            </div>
+          ))}
+
+          {matches.length === 0 && (
+            <p className="rounded-2xl border border-dashed border-slate-300 p-6 text-center text-slate-500">
+              Nessuna partita. Scaricala dall&apos;API o aggiungila a mano.
+            </p>
+          )}
+        </section>
+
+
+        <button
+          onClick={save}
+          disabled={busy || matches.length === 0}
+          className="sticky bottom-24 z-10 rounded-xl bg-slate-900 px-5 py-4 text-lg font-semibold text-white shadow-lg disabled:opacity-50"
+        >
+          {busy ? "Un attimo…" : "Salva le partite"}
+        </button>
+        </>
+      )}
     </main>
   );
 }

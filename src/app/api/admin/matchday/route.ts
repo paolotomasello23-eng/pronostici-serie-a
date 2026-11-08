@@ -1,15 +1,17 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAdmin } from "@/lib/auth/guards";
+import { requireAppAdmin } from "@/lib/auth/guards";
 import { serviceClient } from "@/lib/supabase/server";
 import { applyMatchday, logSyncRun } from "@/lib/matches/apply";
+import { recomputeMatchdayAllLeagues } from "@/lib/scoring/persist";
+import { notifyIfComplete } from "@/lib/push/results";
 import { fetchMatchdayFromApi, FootballDataError } from "@/lib/matches/football-data";
 import { env } from "@/lib/env";
 import type { MatchInput, MatchStatus } from "@/lib/matches/types";
 
 /** Le partite di una giornata, per il pannello admin. */
 export async function GET(request: Request) {
-  const auth = await requireAdmin();
+  const auth = await requireAppAdmin();
   if (!auth.ok) {
     return NextResponse.json({ error: "Non autorizzato." }, { status: auth.status });
   }
@@ -53,7 +55,7 @@ const syncSchema = z.object({
 
 /** Scarica la giornata da football-data.org e la salva. */
 export async function POST(request: Request) {
-  const auth = await requireAdmin();
+  const auth = await requireAppAdmin();
   if (!auth.ok) {
     return NextResponse.json({ error: "Non autorizzato." }, { status: auth.status });
   }
@@ -136,7 +138,7 @@ export async function POST(request: Request) {
  * scritta nell'audit log.
  */
 export async function PATCH(request: Request) {
-  const auth = await requireAdmin();
+  const auth = await requireAppAdmin();
   if (!auth.ok) {
     return NextResponse.json({ error: "Non autorizzato." }, { status: auth.status });
   }
@@ -205,7 +207,7 @@ export async function PATCH(request: Request) {
  * significherebbe far sparire pronostici altrui senza che se ne accorgano.
  */
 export async function DELETE(request: Request) {
-  const auth = await requireAdmin();
+  const auth = await requireAppAdmin();
   if (!auth.ok) {
     return NextResponse.json({ error: "Non autorizzato." }, { status: auth.status });
   }
@@ -268,7 +270,14 @@ const manualSchema = z.object({
         externalId: z.string().nullable().optional(),
         homeTeam: z.string().trim().min(1).max(60),
         awayTeam: z.string().trim().min(1).max(60),
-        kickoffAt: z.string().min(1),
+        // Il nome corto ("Inter" e non "FC Internazionale Milano"): se manca
+        // si usa quello intero, come per le partite inserite a mano.
+        homeTeamShort: z.string().trim().max(60).nullable().optional(),
+        awayTeamShort: z.string().trim().max(60).nullable().optional(),
+        kickoffAt: z
+          .string()
+          .min(1)
+          .refine((v) => !Number.isNaN(new Date(v).getTime()), "data non valida"),
         status: z.enum(STATUSES as [MatchStatus, ...MatchStatus[]]),
         homeGoals: z.number().int().min(0).max(20).nullable(),
         awayGoals: z.number().int().min(0).max(20).nullable(),
@@ -286,7 +295,7 @@ const manualSchema = z.object({
  * manuale non è una scorciatoia di serie B.
  */
 export async function PUT(request: Request) {
-  const auth = await requireAdmin();
+  const auth = await requireAppAdmin();
   if (!auth.ok) {
     return NextResponse.json({ error: "Non autorizzato." }, { status: auth.status });
   }
@@ -303,16 +312,16 @@ export async function PUT(request: Request) {
 
   const inputs: MatchInput[] = matches.map((m) => {
     const kickoff = new Date(m.kickoffAt);
-    if (Number.isNaN(kickoff.getTime())) {
-      throw new Error(`Data non valida: ${m.kickoffAt}`);
-    }
     return {
       id: m.id ?? null,
       externalId: m.externalId ?? null,
       homeTeam: m.homeTeam,
-      homeTeamShort: m.homeTeam,
+      // Prima qui finiva il nome intero: bastava correggere un risultato
+      // per ritrovarsi "FC Internazionale Milano" al posto di "Inter" in
+      // tutte le partite della giornata.
+      homeTeamShort: m.homeTeamShort || m.homeTeam,
       awayTeam: m.awayTeam,
-      awayTeamShort: m.awayTeam,
+      awayTeamShort: m.awayTeamShort || m.awayTeam,
       kickoffAt: kickoff.toISOString(),
       status: m.status,
       homeGoals: m.homeGoals,
@@ -338,7 +347,17 @@ export async function PUT(request: Request) {
       after: { season, number, count: inputs.length },
     });
 
-    return NextResponse.json({ ok: true, ...result });
+    // A giornata iniziata una correzione cambia dei punti, e i punti sono
+    // di tutte le leghe: si rifanno subito, invece di affidarsi a un
+    // "Ricalcola" che è facile dimenticare.
+    const started =
+      !!result.lockAt && new Date(result.lockAt).getTime() <= Date.now();
+    const scored = started
+      ? await recomputeMatchdayAllLeagues(admin, result.matchdayId)
+      : null;
+    if (scored) await notifyIfComplete(admin, scored);
+
+    return NextResponse.json({ ok: true, ...result, scored });
   } catch (error) {
     console.error("[/api/admin/matchday] salvataggio manuale fallito:", error);
     return NextResponse.json(
