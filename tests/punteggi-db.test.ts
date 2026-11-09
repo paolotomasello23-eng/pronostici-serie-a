@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { SignJWT } from "jose";
-import { recomputeMatchday } from "@/lib/scoring/persist";
+import { recomputeMatchday, recomputeMatchdayAllLeagues } from "@/lib/scoring/persist";
 import { computeStandings } from "@/lib/scoring";
 
 /**
@@ -275,7 +275,20 @@ describe.skipIf(!canRun)("punteggi scritti nel database", () => {
     expect(totals.get(players.bruno)).toBe(9); // 2 + 5 + 2
     expect(totals.get(players.carla)).toBe(0);
 
-    // La giornata ora è completa.
+    // Ricalcolare una lega sola non chiude la giornata: il calendario è di
+    // tutte, e le altre leghe non hanno ancora i loro punti.
+    const { data: dopoUna } = await admin
+      .from("matchdays")
+      .select("status")
+      .eq("id", matchdayId)
+      .single();
+    expect(dopoUna!.status).toBe("locked");
+
+    // La chiude il ricalcolo di tutte le leghe.
+    const tutte = await recomputeMatchdayAllLeagues(admin, matchdayId);
+    expect(tutte.complete).toBe(true);
+    expect(tutte.leagueIds).toContain(leagueId);
+
     const { data: day } = await admin
       .from("matchdays")
       .select("status")

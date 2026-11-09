@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSessionWithToken } from "@/lib/auth/session";
 import { userClient } from "@/lib/supabase/server";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 import { computeStandings } from "@/lib/scoring";
 import type { MatchScore, PlayerRef, StandingsRow } from "@/lib/scoring";
 import { Podium, type PodiumRow } from "@/components/podium";
@@ -54,15 +55,25 @@ export default async function ClassificaPage({
     (avatars ?? []).map((a) => [a.player_id as string, a.avatar_url as string | null]),
   );
 
-  const { data: rows } = await supabase
-    .from("v_scores_by_matchday")
-    .select(
-      "player_id, match_id, outcome_correct, exact, base_points, unique_bonus, points, matchday_number",
-    )
-    .eq("league_id", auth.session.leagueId)
-    .eq("season", league.season);
+  // A pagine: Supabase ne restituisce al massimo 1000 per volta, e con
+  // dieci giocatori si superano dopo dieci giornate. Una lettura singola
+  // tagliava via i punteggi in eccesso senza dire niente, e la classifica
+  // risultava semplicemente sbagliata.
+  const leagueId = auth.session.leagueId;
+  const rows = await fetchAll<Record<string, unknown>>((from, to) =>
+    supabase
+      .from("v_scores_by_matchday")
+      .select(
+        "player_id, match_id, outcome_correct, exact, base_points, unique_bonus, points, matchday_number",
+      )
+      .eq("league_id", leagueId)
+      .eq("season", league.season)
+      .order("match_id")
+      .order("player_id")
+      .range(from, to),
+  );
 
-  const all = rows ?? [];
+  const all = rows;
 
   const toScore = (r: (typeof all)[number]): MatchScore => ({
     playerId: r.player_id as string,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 /**
  * Quanto manca al blocco dei pronostici.
@@ -24,18 +24,34 @@ export function Countdown({
   lockAt,
   compiled,
   total,
+  onExpire,
 }: {
   lockAt: string;
   compiled?: number;
   total?: number;
+  /** Chiamata una volta, quando il tempo finisce. */
+  onExpire?: () => void;
 }) {
   const [remaining, setRemaining] = useState<number | null>(null);
+  const onExpireRef = useRef(onExpire);
+  useEffect(() => {
+    onExpireRef.current = onExpire;
+  });
 
   useEffect(() => {
     const target = new Date(lockAt).getTime();
-    const tick = () => setRemaining(target - Date.now());
-    tick();
+    let expired = false;
+    const tick = () => {
+      const left = target - Date.now();
+      setRemaining(left);
+      if (left <= 0 && !expired) {
+        expired = true;
+        clearInterval(id);
+        onExpireRef.current?.();
+      }
+    };
     const id = setInterval(tick, 1000);
+    tick();
     return () => clearInterval(id);
   }, [lockAt]);
 

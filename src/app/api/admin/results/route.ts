@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAdmin } from "@/lib/auth/guards";
+import { requireAppAdmin } from "@/lib/auth/guards";
 import { serviceClient } from "@/lib/supabase/server";
 import { applyMatchday, logSyncRun } from "@/lib/matches/apply";
 import { fetchMatchdayFromApi, FootballDataError } from "@/lib/matches/football-data";
-import { recomputeMatchday } from "@/lib/scoring/persist";
+import { recomputeMatchdayAllLeagues } from "@/lib/scoring/persist";
+import { notifyIfComplete } from "@/lib/push/results";
 import { env } from "@/lib/env";
 
 const schema = z.object({
@@ -34,7 +35,7 @@ async function findMatchday(
  * niente — semplicemente non produce punti finché non si gioca.
  */
 export async function POST(request: Request) {
-  const auth = await requireAdmin();
+  const auth = await requireAppAdmin();
   if (!auth.ok) {
     return NextResponse.json({ error: "Non autorizzato." }, { status: auth.status });
   }
@@ -64,10 +65,11 @@ export async function POST(request: Request) {
       source: "api",
     });
 
-    const scored = await recomputeMatchday(admin, {
-      leagueId: auth.session.leagueId,
-      matchdayId: applied.matchdayId,
-    });
+    // Tutte le leghe, non solo quella di chi preme il pulsante: il
+    // risultato è lo stesso per tutti. Ricalcolarne una sola e segnare la
+    // giornata come chiusa lasciava le altre senza quei punti, per sempre.
+    const scored = await recomputeMatchdayAllLeagues(admin, applied.matchdayId);
+    await notifyIfComplete(admin, scored);
 
     await logSyncRun(admin, {
       kind: "results",
@@ -76,7 +78,7 @@ export async function POST(request: Request) {
       message: `${scored.finishedMatches}/${scored.totalMatches} partite finite, ${scored.scoredRows} punteggi.`,
     });
 
-    return NextResponse.json({ ok: true, ...scored });
+    return NextResponse.json({ ok: true, ...scored, leagues: scored.leagueIds.length });
   } catch (error) {
     const httpStatus =
       error instanceof FootballDataError ? (error.httpStatus ?? null) : null;
@@ -109,7 +111,7 @@ export async function POST(request: Request) {
  * pronostici di tutti e va quindi sempre ricalcolato per intero.
  */
 export async function PUT(request: Request) {
-  const auth = await requireAdmin();
+  const auth = await requireAppAdmin();
   if (!auth.ok) {
     return NextResponse.json({ error: "Non autorizzato." }, { status: auth.status });
   }
@@ -131,20 +133,18 @@ export async function PUT(request: Request) {
   }
 
   try {
-    const scored = await recomputeMatchday(admin, {
-      leagueId: auth.session.leagueId,
-      matchdayId,
-    });
+    const scored = await recomputeMatchdayAllLeagues(admin, matchdayId);
+    await notifyIfComplete(admin, scored);
 
     await admin.from("audit_log").insert({
       actor_id: auth.session.playerId,
       action: "scores.recompute",
       entity: "matchday",
       entity_id: matchdayId,
-      after: scored,
+      after: { ...scored, leagueIds: undefined, leagues: scored.leagueIds.length },
     });
 
-    return NextResponse.json({ ok: true, ...scored });
+    return NextResponse.json({ ok: true, ...scored, leagues: scored.leagueIds.length });
   } catch (error) {
     console.error("[/api/admin/results] ricalcolo fallito:", error);
     return NextResponse.json(

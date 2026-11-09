@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getSession, createSessionToken, setSessionCookie } from "@/lib/auth/session";
 import { serviceClient } from "@/lib/supabase/server";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 import { normalizeInviteCode } from "@/lib/leagues";
 
 /** Le leghe a cui appartengo, con quanti siamo e la giornata in corso. */
@@ -22,15 +23,28 @@ export async function GET() {
   const leagueIds = (memberships ?? []).map((m) => m.league_id as string);
 
   const { data: leagues } = leagueIds.length
-    ? await admin.from("leagues").select("id, name, season").in("id", leagueIds)
+    ? await admin
+        .from("leagues")
+        .select("id, name, season, invite_code")
+        .in("id", leagueIds)
     : { data: [] };
 
-  const { data: counts } = leagueIds.length
-    ? await admin.from("league_members").select("league_id").in("league_id", leagueIds)
-    : { data: [] };
+  // A pagine: sommando le iscrizioni di più leghe numerose si superano in
+  // fretta le 1000 righe, e il conteggio dei giocatori risultava più basso.
+  const counts = leagueIds.length
+    ? await fetchAll<Record<string, unknown>>((from, to) =>
+        admin
+          .from("league_members")
+          .select("league_id, player_id")
+          .in("league_id", leagueIds)
+          .order("league_id")
+          .order("player_id")
+          .range(from, to),
+      )
+    : [];
 
   const players = new Map<string, number>();
-  for (const row of counts ?? []) {
+  for (const row of counts) {
     const id = row.league_id as string;
     players.set(id, (players.get(id) ?? 0) + 1);
   }
@@ -46,6 +60,9 @@ export async function GET() {
         id: m.league_id as string,
         name: (league?.name as string) ?? "Lega",
         season: league?.season as number,
+        // Il codice da girare agli amici. Lo vedono tutti i membri, come
+        // quando stava nella schermata principale: chi è dentro può invitare.
+        inviteCode: (league?.invite_code as string) ?? null,
         displayName: m.display_name as string,
         isAdmin: m.role === "admin",
         players: players.get(m.league_id as string) ?? 1,
@@ -93,11 +110,26 @@ export async function POST(request: Request) {
         { status: 409 },
       );
     }
+    if (message.includes("NAME_TAKEN")) {
+      return NextResponse.json(
+        { error: "In questa lega il tuo nome è già usato da altri." },
+        { status: 409 },
+      );
+    }
     console.error("[/api/leagues/mine] ingresso fallito:", error);
     return NextResponse.json({ error: "Ingresso non riuscito." }, { status: 500 });
   }
 
   const row = data as { league_id: string; league_name: string };
+
+  // Il nome in lega non è sempre il nome utente: se era già occupato ha
+  // ricevuto un suffisso, e la sessione deve usare quello vero.
+  const { data: membership } = await admin
+    .from("league_members")
+    .select("display_name")
+    .eq("league_id", row.league_id)
+    .eq("player_id", session.playerId)
+    .maybeSingle();
 
   // Chi entra in una lega ci vuole entrare adesso, non sceglierla di nuovo
   // da un elenco: la rendiamo subito quella attiva.
@@ -106,7 +138,7 @@ export async function POST(request: Request) {
       playerId: session.playerId,
       username: session.username,
       leagueId: row.league_id,
-      displayName: session.username,
+      displayName: (membership?.display_name as string) ?? session.username,
       isAdmin: false,
     }),
   );

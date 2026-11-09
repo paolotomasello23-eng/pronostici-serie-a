@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSessionWithToken } from "@/lib/auth/session";
 import { userClient } from "@/lib/supabase/server";
+import { isAppAdmin } from "@/lib/auth/guards";
 import { TeamCrest } from "@/components/team-crest";
 import { Countdown } from "@/components/countdown";
 import { AppMenu } from "@/components/app-menu";
@@ -10,6 +11,7 @@ import {
   predictionsOpenAt,
 } from "@/lib/matches/types";
 import { Avatar } from "@/components/avatar";
+import { PushSync } from "@/components/push-sync";
 
 function formatRome(iso: string): string {
   return new Date(iso).toLocaleString("it-IT", {
@@ -28,6 +30,7 @@ export default async function Home() {
   if (!auth.session.leagueId) redirect("/leghe");
 
   const { session, token } = auth;
+  const appAdmin = await isAppAdmin(session.playerId);
 
   // Deliberatamente il client "utente" e non quello di servizio: se le policy
   // RLS fossero sbagliate, questa pagina resterebbe vuota. È il modo più
@@ -138,6 +141,7 @@ export default async function Home() {
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-6 p-4 pb-10">
+      <PushSync />
       <header className="flex items-start justify-between gap-3 pt-3">
         <div className="min-w-0">
           <p className="truncate text-lg font-semibold text-slate-500">
@@ -150,7 +154,7 @@ export default async function Home() {
             </span>
           </h1>
         </div>
-        <AppMenu isAdmin={session.isAdmin} />
+        <AppMenu isAdmin={session.isAdmin || appAdmin} />
       </header>
 
       {matchday ? (
@@ -257,7 +261,7 @@ export default async function Home() {
         <section className="rounded-2xl border border-dashed border-slate-300 p-5 text-center text-slate-500">
           <p className="text-sm">
             Nessuna giornata caricata.
-            {session.isAdmin && " Scaricala dal pannello admin."}
+            {appAdmin && " Scaricala dal pannello admin."}
           </p>
         </section>
       )}

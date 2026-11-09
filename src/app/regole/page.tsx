@@ -66,7 +66,7 @@ export default function RegolePage() {
           <li>
             I pronostici possono essere liberamente inseriti o modificati fino
             all&apos;orario ufficiale del{" "}
-            <strong>fischio d&apos;inizio della prima giornata</strong>.
+            <strong>fischio d&apos;inizio della prima partita della giornata</strong>.
             Contestualmente all&apos;avvio della prima gara, il sistema
             bloccherà le partite e{" "}
             <strong>non sarà più possibile modificare</strong> i propri

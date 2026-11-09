@@ -63,11 +63,24 @@ const KNOWN_STATUSES: readonly string[] = [
   "FINISHED", "POSTPONED", "SUSPENDED", "CANCELLED",
 ];
 
+/** Stati che football-data usa e il nostro database non conosce. */
+const MAPPED_STATUSES: Record<string, MatchStatus> = {
+  // Supplementari e rigori non esistono in campionato, ma se comparissero
+  // sarebbero una partita in corso.
+  EXTRA_TIME: "IN_PLAY",
+  PENALTY_SHOOTOUT: "IN_PLAY",
+  // Vittoria a tavolino: il risultato lo decide un giudice, non il campo.
+  // Non produce punti, come un'annullata — e come un'annullata non va
+  // aspettata. Trattarla da "non ancora giocata" teneva la giornata aperta
+  // per sempre, senza classifica di giornata né notifica dei risultati.
+  AWARDED: "CANCELLED",
+};
+
 function toStatus(raw: string): MatchStatus {
-  // "AWARDED" (vittoria a tavolino) e qualunque stato nuovo che l'API
-  // introducesse: meglio trattarli come "non ancora finita" che assegnare
-  // punti su un risultato che non sappiamo leggere.
-  return (KNOWN_STATUSES.includes(raw) ? raw : "SCHEDULED") as MatchStatus;
+  if (KNOWN_STATUSES.includes(raw)) return raw as MatchStatus;
+  // Qualunque stato nuovo che l'API introducesse: meglio "non ancora
+  // finita" che assegnare punti su un risultato che non sappiamo leggere.
+  return MAPPED_STATUSES[raw] ?? "SCHEDULED";
 }
 
 async function request(path: string, apiKey: string): Promise<unknown> {

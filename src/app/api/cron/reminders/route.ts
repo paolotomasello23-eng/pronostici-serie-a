@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { isAuthorizedCron } from "@/lib/cron/auth";
 import { serviceClient } from "@/lib/supabase/server";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 import { sendToPlayer } from "@/lib/push/send";
 import { predictionsOpenAt } from "@/lib/matches/types";
 
@@ -107,6 +108,36 @@ function formattaOra(iso: string): string {
   });
 }
 
+/**
+ * Chi gioca, una riga per persona.
+ *
+ * Le iscrizioni sono una per lega: chi è in due leghe comparirebbe due
+ * volte. Il lucchetto su `push_reminders` impediva comunque il doppio invio,
+ * ma a pagine e senza doppioni si legge tutto — oltre le 1000 righe una
+ * lettura singola lasciava fuori qualcuno, che non riceveva mai niente.
+ */
+async function giocatori(
+  admin: ReturnType<typeof serviceClient>,
+): Promise<Array<{ playerId: string; nome: string }>> {
+  const righe = await fetchAll<Record<string, unknown>>((from, to) =>
+    admin
+      .from("league_members")
+      .select("player_id, display_name, joined_at")
+      .order("player_id")
+      .order("joined_at")
+      .order("league_id")
+      .range(from, to),
+  );
+
+  const visti = new Map<string, string>();
+  for (const r of righe) {
+    const id = r.player_id as string;
+    // Il nome della prima lega in cui è entrato: di norma è il nome utente.
+    if (!visti.has(id)) visti.set(id, r.display_name as string);
+  }
+  return [...visti].map(([playerId, nome]) => ({ playerId, nome }));
+}
+
 export async function POST(request: Request) {
   if (!isAuthorizedCron(request)) {
     return NextResponse.json({ error: "Non autorizzato." }, { status: 401 });
@@ -136,6 +167,7 @@ export async function POST(request: Request) {
       .lte("lock_at", new Date(now.getTime() + 6 * 86_400_000).toISOString());
 
     let annunci = 0;
+    let tutti: Array<{ playerId: string; nome: string }> | null = null;
 
     for (const giornata of aperte ?? []) {
       const apertura = predictionsOpenAt(giornata.lock_at as string).getTime();
@@ -143,19 +175,17 @@ export async function POST(request: Request) {
 
       if (daQuando < 0 || daQuando > RITARDO_MAX_APERTURA_ORE) continue;
 
-      const { data: membri } = await admin
-        .from("league_members")
-        .select("player_id");
+      tutti ??= await giocatori(admin);
 
-      for (const membro of membri ?? []) {
+      for (const membro of tutti) {
         const { error: giaFatto } = await admin.from("push_reminders").insert({
           matchday_id: giornata.id as string,
-          player_id: membro.player_id as string,
+          player_id: membro.playerId,
           kind: "apertura",
         });
         if (giaFatto) continue;
 
-        const esito = await sendToPlayer(admin, membro.player_id as string, {
+        const esito = await sendToPlayer(admin, membro.playerId, {
           title: `Giornata ${giornata.number} aperta`,
           body: "Puoi mettere i tuoi pronostici",
           url: `/pronostici?giornata=${giornata.number}`,
@@ -199,25 +229,30 @@ export async function POST(request: Request) {
       const matchIds = (matches ?? []).map((m) => m.id as string);
       if (matchIds.length === 0) continue;
 
-      const { data: members } = await admin
-        .from("league_members")
-        .select("player_id, display_name");
+      tutti ??= await giocatori(admin);
 
-      const { data: predictions } = await admin
-        .from("predictions")
-        .select("player_id")
-        .in("match_id", matchIds);
+      // A pagine anche qui: dieci partite per cento persone fanno già mille
+      // righe, e chi restava fuori dal conteggio si sentiva dire che gli
+      // mancavano pronostici già messi.
+      const predictions = await fetchAll<Record<string, unknown>>((from, to) =>
+        admin
+          .from("predictions")
+          .select("id, player_id")
+          .in("match_id", matchIds)
+          .order("id")
+          .range(from, to),
+      );
 
       const compilati = new Map<string, number>();
-      for (const p of predictions ?? []) {
+      for (const p of predictions) {
         const id = p.player_id as string;
         compilati.set(id, (compilati.get(id) ?? 0) + 1);
       }
 
       let inviate = 0;
 
-      for (const member of members ?? []) {
-        const playerId = member.player_id as string;
+      for (const member of tutti) {
+        const playerId = member.playerId;
         const mancanti = matchIds.length - (compilati.get(playerId) ?? 0);
 
         if (fase.soloIncompleti && mancanti <= 0) continue;
@@ -235,7 +270,7 @@ export async function POST(request: Request) {
 
         const esito = await sendToPlayer(admin, playerId, {
           ...fase.messaggio({
-            nome: member.display_name as string,
+            nome: member.nome,
             mancanti,
             giornata: matchday.number as number,
             oraBlocco: formattaOra(matchday.lock_at as string),

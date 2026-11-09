@@ -163,6 +163,133 @@ export function ProfileEditor({
           È il nome con cui accedi e con cui ti vedono gli altri.
         </p>
       </section>
+
+      <ChangePin />
     </main>
+  );
+}
+
+function PinField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="flex flex-col gap-1.5">
+      <span className="text-sm font-medium">{label}</span>
+      <input
+        type="password"
+        inputMode="numeric"
+        autoComplete="off"
+        value={value}
+        onChange={(e) => onChange(e.target.value.replace(/\D/g, "").slice(0, 6))}
+        placeholder="······"
+        className="rounded-xl border border-slate-300 px-4 py-3 text-center text-xl tracking-[0.5em]"
+        required
+      />
+    </label>
+  );
+}
+
+/**
+ * Cambio del PIN. Chiuso finché non lo si apre: è una cosa che si fa di
+ * rado, e tre caselle sempre in vista sarebbero solo ingombro.
+ */
+function ChangePin() {
+  const [open, setOpen] = useState(false);
+  const [current, setCurrent] = useState("");
+  const [next, setNext] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    setError(null);
+    if (next !== confirm) {
+      setError("I due PIN nuovi non coincidono.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const response = await fetch("/api/profile/pin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentPin: current, newPin: next }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error ?? "Cambio non riuscito.");
+      setDone(true);
+      setOpen(false);
+      setCurrent("");
+      setNext("");
+      setConfirm("");
+    } catch (e) {
+      setError((e as Error).message);
+      setCurrent("");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!open) {
+    return (
+      <section className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-medium text-slate-500">PIN</p>
+            <p className="mt-1 text-xs text-slate-500">
+              {done ? "PIN cambiato." : "Ti serve per rientrare."}
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              setOpen(true);
+              setDone(false);
+            }}
+            className="shrink-0 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium"
+          >
+            Cambia PIN
+          </button>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <form
+      onSubmit={submit}
+      className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-4"
+    >
+      <p className="font-semibold">Cambia PIN</p>
+      {error && (
+        <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>
+      )}
+      <PinField label="PIN attuale" value={current} onChange={setCurrent} />
+      <PinField label="Nuovo PIN (6 cifre)" value={next} onChange={setNext} />
+      <PinField label="Ripeti il nuovo PIN" value={confirm} onChange={setConfirm} />
+      <button
+        type="submit"
+        disabled={busy}
+        className="rounded-xl bg-slate-900 px-4 py-3 font-semibold text-white disabled:opacity-50"
+      >
+        {busy ? "Un attimo…" : "Salva il nuovo PIN"}
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          setOpen(false);
+          setError(null);
+        }}
+        className="text-sm text-slate-500 underline"
+      >
+        Annulla
+      </button>
+    </form>
   );
 }

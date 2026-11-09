@@ -10,6 +10,7 @@ interface League {
   displayName: string;
   isAdmin: boolean;
   players: number;
+  inviteCode: string | null;
 }
 
 /**
@@ -30,6 +31,11 @@ export default function LeghePage() {
   const [leagueName, setLeagueName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Lega appena creata: prima di entrarci si mostra il codice da mandare
+  // agli amici, altrimenti non lo si vedrebbe da nessuna parte.
+  const [creata, setCreata] = useState<{ name: string; inviteCode: string } | null>(
+    null,
+  );
 
   const load = useCallback(async () => {
     const response = await fetch("/api/leagues/mine");
@@ -98,12 +104,44 @@ export default function LeghePage() {
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error ?? "Creazione non riuscita.");
-      router.push("/");
-      router.refresh();
+      setCreata({ name: data.name, inviteCode: data.inviteCode });
+      setBusy(false);
     } catch (e) {
       setError((e as Error).message);
       setBusy(false);
     }
+  }
+
+  if (creata) {
+    return (
+      <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-6 p-6">
+        <h1 className="text-2xl font-bold tracking-tight">Lega creata</h1>
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center">
+          <p className="text-sm font-medium text-slate-500">
+            Codice d&apos;invito di {creata.name}
+          </p>
+          <p className="mt-2 text-4xl font-bold tracking-[0.3em]">
+            {creata.inviteCode}
+          </p>
+          <div className="mt-4">
+            <ShareCode name={creata.name} code={creata.inviteCode} />
+          </div>
+        </div>
+        <p className="text-slate-600">
+          Mandalo ai tuoi amici: gli serve per entrare. Lo ritrovi sempre qui,
+          nella schermata delle tue leghe.
+        </p>
+        <button
+          onClick={() => {
+            router.push("/");
+            router.refresh();
+          }}
+          className="rounded-xl bg-slate-900 px-5 py-4 text-lg font-semibold text-white active:bg-slate-700"
+        >
+          Entra nella lega
+        </button>
+      </main>
+    );
   }
 
   return (
@@ -124,15 +162,16 @@ export default function LeghePage() {
       ) : (
         <ul className="flex flex-col gap-3">
           {leagues.map((league) => (
-            <li key={league.id}>
+            <li
+              key={league.id}
+              className={`overflow-hidden rounded-2xl border bg-white ${
+                league.id === activeId ? "border-slate-900" : "border-slate-200"
+              }`}
+            >
               <button
                 onClick={() => open(league.id)}
                 disabled={busy}
-                className={`flex w-full items-center justify-between gap-3 rounded-2xl border bg-white px-4 py-4 text-left disabled:opacity-50 ${
-                  league.id === activeId
-                    ? "border-slate-900"
-                    : "border-slate-200"
-                }`}
+                className="flex w-full items-center justify-between gap-3 px-4 py-4 text-left disabled:opacity-50"
               >
                 <span className="min-w-0">
                   <span className="block truncate text-lg font-semibold">
@@ -149,12 +188,24 @@ export default function LeghePage() {
                   ›
                 </span>
               </button>
+              {league.inviteCode && (
+                <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-4 py-2.5">
+                  <span className="text-sm text-slate-500">
+                    Codice{" "}
+                    <span className="font-semibold tracking-[0.15em] text-slate-900">
+                      {league.inviteCode}
+                    </span>
+                  </span>
+                  <ShareCode name={league.name} code={league.inviteCode} />
+                </div>
+              )}
             </li>
           ))}
 
           {leagues.length === 0 && (
             <li className="rounded-2xl border border-dashed border-slate-300 p-6 text-center text-slate-500">
-              Non sei ancora in nessuna lega. Serve un codice d&apos;invito.
+              Non sei ancora in nessuna lega: entra con un codice d&apos;invito,
+              oppure creane una tu.
             </li>
           )}
         </ul>
@@ -258,5 +309,40 @@ export default function LeghePage() {
         Esci
       </a>
     </main>
+  );
+}
+
+/**
+ * Manda il codice d'invito: dal telefono apre la condivisione di sistema
+ * (WhatsApp e compagnia), altrove lo copia negli appunti.
+ */
+function ShareCode({ name, code }: { name: string; code: string }) {
+  const [copiato, setCopiato] = useState(false);
+
+  async function condividi() {
+    const text = `Entra nella lega "${name}" su Pronostici Serie A con il codice ${code}`;
+    const url = window.location.origin;
+    try {
+      if (navigator.share) {
+        await navigator.share({ text, url });
+        return;
+      }
+      await navigator.clipboard.writeText(`${text}: ${url}`);
+      setCopiato(true);
+      setTimeout(() => setCopiato(false), 2000);
+    } catch {
+      // Condivisione annullata, o appunti non disponibili: il codice resta
+      // comunque scritto lì accanto.
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={condividi}
+      className="shrink-0 rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 active:bg-slate-100"
+    >
+      {copiato ? "Copiato" : "Invita"}
+    </button>
   );
 }

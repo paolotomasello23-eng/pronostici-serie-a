@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { bindSubscription } from "./push-sync";
 
 /**
  * Attiva o disattiva le notifiche su questo dispositivo.
@@ -107,6 +108,12 @@ export function PushToggle() {
     const registration = await navigator.serviceWorker.getRegistration();
     const subscription = await registration?.pushManager.getSubscription();
     setState(subscription ? "on" : "off");
+
+    // "Attive" deve voler dire attive per te: se l'iscrizione era di chi ha
+    // usato questo dispositivo prima, la si intesta a chi c'è adesso.
+    if (subscription && Notification.permission === "granted") {
+      await bindSubscription(subscription).catch(() => false);
+    }
   }, []);
 
   useEffect(() => {
@@ -134,14 +141,8 @@ export function PushToggle() {
         applicationServerKey: urlBase64ToUint8Array(key),
       });
 
-      const response = await fetch("/api/push/subscribe", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(subscription.toJSON()),
-      });
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.error ?? "Attivazione fallita.");
+      if (!(await bindSubscription(subscription))) {
+        throw new Error("Attivazione fallita.");
       }
 
       setState("on");

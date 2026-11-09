@@ -135,7 +135,12 @@ export async function POST(request: Request) {
     );
   }
 
-  const { predictions } = parsed.data;
+  // La stessa partita due volte nello stesso invio farebbe fallire l'intero
+  // salvataggio ("una delle partite non esiste", o un errore del database):
+  // vale l'ultima.
+  const predictions = [
+    ...new Map(parsed.data.predictions.map((p) => [p.matchId, p])).values(),
+  ];
   const matchIds = predictions.map((p) => p.matchId);
 
   // Controllo esplicito del lock, per poter dire *perché* il salvataggio
