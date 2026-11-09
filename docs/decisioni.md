@@ -14,8 +14,9 @@ Le scelte prese all'inizio e il perché. Quando fra sei mesi ci chiederemo
 
 - `+3` risultato esatto.
 - `+1` esito 1/X/2 corretto ma risultato sbagliato. Non si somma con il +3.
-- `+1` bonus a chi è l'**unico** ad aver azzeccato l'esito di quel match.
-  Si somma: esito unico = 2, risultato esatto e unico = 4.
+- Bonus controcorrente: ogni partita mette in palio **2 punti** fra chi ne
+  ha azzeccato l'esito. Uno solo → 2 punti; in due → 1 a testa; in tre o più
+  → niente. Si somma ai punti base: risultato esatto e unico = 5.
 - Il bonus richiede almeno **3 pronostici** sulla partita
   (`leagues.unique_bonus_min_predictions`, modificabile dall'admin).
   Senza soglia, chi è l'unico ad aver compilato quella riga incasserebbe il
@@ -78,16 +79,20 @@ ma il giorno in cui qualcuno contesterà un risultato varranno il loro prezzo.
   intercambiabili. L'admin può sempre correggere partite e risultati a mano e
   forzare il ricalcolo.
 - Non si assegnano punti finché la partita non è `FINISHED`.
-- Scheduler: **GitHub Actions su repo pubblico** (minuti illimitati; su repo
-  privato un cron frequente sforerebbe i 2.000 minuti/mese, perché ogni run
-  viene fatturato con un minimo di 1 minuto). I workflow chiamano endpoint
-  protetti da `CRON_SECRET`.
+- Scheduler: **pg_cron dentro Supabase** (migrazione 0016), che chiama gli
+  endpoint protetti da `CRON_SECRET`. All'inizio era GitHub Actions su repo
+  pubblico, ma GitHub disattiva i workflow programmati dopo 60 giorni senza
+  commit (è successo il 21 ottobre 2026, e per tre settimane non si è
+  aggiornato niente) e sotto carico ne eseguiva solo una piccola parte.
+- Calendario e risultati sono comuni a tutte le leghe: li gestisce solo
+  l'**admin dell'app** (`players.is_app_admin`). L'admin di una lega gestisce
+  i suoi giocatori. Ogni cambio di risultato ricalcola tutte le leghe.
 
 Poiché il repo è pubblico: nessun segreto nel codice, mai. Un hook di
 pre-commit in `.githooks/` prova a intercettare gli incidenti.
 
-Supabase free mette in pausa i progetti dopo ~7 giorni di inattività: in
-pausa-campionato serve un ping settimanale, previsto in M7.
+Supabase free mette in pausa i progetti dopo ~7 giorni di inattività: il
+sync del calendario due volte al giorno lo tiene sveglio.
 
 ## Milestone
 

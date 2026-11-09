@@ -1,16 +1,13 @@
 name: Sincronizza calendario
 
-# Gli orari di Serie A cambiano fino a pochi giorni prima, e con loro il
-# momento in cui la giornata si blocca. Due giri al giorno bastano: nessuno
-# sposta una partita di venerdì al martedì pomeriggio senza preavviso.
+# Aggiorna partite e orari della giornata in corso e della successiva.
 #
-# Gli orari sono in UTC: 06:00 e 18:00 UTC = 08:00 e 20:00 in Italia
-# (07:00 e 19:00 in inverno).
+# Solo avvio a mano, dalla scheda Actions: per provarlo o per recuperare un
+# giro saltato. La programmazione automatica sta in Supabase (pg_cron,
+# migrazione 0016), perche' GitHub disattiva i workflow programmati dopo 60
+# giorni senza commit — e' successo il 21 ottobre 2026 — e sotto carico ne
+# salta la maggior parte.
 on:
-  schedule:
-    - cron: "0 6,18 * * *"
-  # Permette di lanciarlo a mano dalla scheda Actions, utile per provarlo
-  # senza aspettare il prossimo orario.
   workflow_dispatch:
 
 jobs:

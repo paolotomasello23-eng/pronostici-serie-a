@@ -1,15 +1,13 @@
 name: Promemoria pronostici
 
-# Ogni dieci minuti: e' l'endpoint a decidere se sia il momento di una delle
-# tre chiamate. La piu' vicina al fischio d'inizio ha una finestra di mezz'ora,
-# e con un giro all'ora la mancheremmo quasi sempre.
+# Manda l'annuncio di apertura e i promemoria prima del blocco.
 #
-# Ogni fase parte una volta sola per giornata e per persona, quindi far girare
-# spesso non produce notifiche ripetute. Dalle 5 alle 23 UTC: prima non si
-# gioca, e nessun blocco cade a notte fonda.
+# Solo avvio a mano, dalla scheda Actions: per provarlo o per recuperare un
+# giro saltato. La programmazione automatica sta in Supabase (pg_cron,
+# migrazione 0016), perche' GitHub disattiva i workflow programmati dopo 60
+# giorni senza commit — e' successo il 21 ottobre 2026 — e sotto carico ne
+# salta la maggior parte.
 on:
-  schedule:
-    - cron: "*/10 5-23 * * *"
   workflow_dispatch:
 
 jobs:

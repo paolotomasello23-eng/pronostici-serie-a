@@ -1,21 +1,13 @@
 name: Sincronizza risultati
 
-# Ogni 15 minuti nelle ore in cui si gioca, così la classifica si aggiorna
-# poco dopo il fischio finale. Sui repository pubblici le Actions non
-# consumano minuti, quindi questa cadenza è gratuita.
+# Scarica i risultati delle giornate iniziate e ricalcola i punteggi.
 #
-# Tutti gli orari sono UTC (l'Italia è avanti di 1 o 2 ore).
+# Solo avvio a mano, dalla scheda Actions: per provarlo o per recuperare un
+# giro saltato. La programmazione automatica sta in Supabase (pg_cron,
+# migrazione 0016), perche' GitHub disattiva i workflow programmati dopo 60
+# giorni senza commit — e' successo il 21 ottobre 2026 — e sotto carico ne
+# salta la maggior parte.
 on:
-  schedule:
-    # Venerdì, sabato, domenica e lunedì: da mezzogiorno a notte fonda,
-    # quando si giocano le partite di giornata. Dalle 12 UTC e non dalle 16:
-    # le partite delle 12:30 e delle 15 (ora italiana) finiscono prima delle
-    # 16 UTC, e restavano fuori dalla classifica per ore.
-    - cron: "*/15 12-23 * * 5,6,0,1"
-    # Martedì e mercoledì sera: i turni infrasettimanali e i recuperi.
-    - cron: "*/30 18-22 * * 2,3"
-    # Una passata al mattino per raccogliere ciò che si fosse perso.
-    - cron: "0 7 * * *"
   workflow_dispatch:
 
 jobs:
