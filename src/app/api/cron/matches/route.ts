@@ -20,7 +20,7 @@ import { env } from "@/lib/env";
  * senza attività va in pausa e va risvegliato a mano.
  */
 export async function POST(request: Request) {
-  if (!isAuthorizedCron(request)) {
+  if (!(await isAuthorizedCron(request))) {
     return NextResponse.json({ error: "Non autorizzato." }, { status: 401 });
   }
 

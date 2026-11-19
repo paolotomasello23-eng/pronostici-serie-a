@@ -139,7 +139,7 @@ async function giocatori(
 }
 
 export async function POST(request: Request) {
-  if (!isAuthorizedCron(request)) {
+  if (!(await isAuthorizedCron(request))) {
     return NextResponse.json({ error: "Non autorizzato." }, { status: 401 });
   }
 
