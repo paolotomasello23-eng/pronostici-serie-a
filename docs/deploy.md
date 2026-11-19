@@ -62,20 +62,21 @@ un'app qualsiasi.
 
 ## 3. Sync automatici
 
-Girano dentro Supabase, con `pg_cron`: ogni tanto il database chiama gli
-indirizzi `/api/cron/...` dell'app, con la chiave `CRON_SECRET`. All'inizio
-stavano su GitHub Actions, ma GitHub li ha disattivati dopo 60 giorni senza
-commit e, anche quando erano attivi, ne eseguiva solo una piccola parte.
+Girano dentro Supabase, con `pg_cron`: il database chiama gli indirizzi
+`/api/cron/...` dell'app a orari fissi. All'inizio stavano su GitHub
+Actions, ma GitHub li ha disattivati dopo 60 giorni senza commit e, anche
+quando erano attivi, ne eseguiva solo una piccola parte.
 
-Nell'SQL Editor di Supabase, una volta sola, salva i due valori nel Vault
-(con quelli veri, mai nel codice):
+Bastano due migrazioni, nell'SQL Editor, in ordine, senza niente da
+modificare:
 
-```sql
-select vault.create_secret('https://nome-progetto.vercel.app', 'pronostici_app_url');
-select vault.create_secret('VALORE-DI-CRON_SECRET', 'pronostici_cron_secret');
-```
+- `0016_cron_in_supabase.sql` programma i job;
+- `0017_cron_senza_chiavi_a_mano.sql` salva nel Vault l'indirizzo dell'app
+  e una chiave generata dal database, che l'app verifica chiedendola al
+  database stesso. Va eseguita quando l'app aggiornata è già online.
 
-Poi esegui la migrazione `0016_cron_in_supabase.sql`, che programma i job:
+Se l'indirizzo dell'app cambiasse (un dominio nuovo), va aggiornato nella
+0017 e rieseguita.
 
 | Job | Quando (UTC) | Cosa fa |
 |---|---|---|
@@ -94,11 +95,18 @@ select created, status_code, left(content, 200) as risposta
   from net._http_response order by created desc limit 20;
 ```
 
-Un `200` vuol dire che l'app ha risposto. `401` è un `CRON_SECRET` sbagliato,
-nessuna riga o un errore di connessione di solito è l'indirizzo dell'app.
+Un `200` vuol dire che l'app ha risposto. `401` vuol dire che l'app non
+riconosce la chiave: di solito la 0017 è stata eseguita prima che l'app
+aggiornata fosse online, e basta rieseguirla.
 
-I workflow in `.github/workflows` restano per l'avvio a mano dalla scheda
-Actions (servono i segreti `APP_URL` e `CRON_SECRET` del repository).
+### La rete di sicurezza su GitHub
+
+I workflow in `.github/workflows` girano anche da soli, poco: il calendario
+alle 07:23 e 19:23 UTC, i risultati alle 08:47. Se i job di Supabase si
+fermassero, le giornate continuerebbero a comparire e la classifica ad
+aggiornarsi, anche se più lentamente. Usano i segreti `APP_URL` e
+`CRON_SECRET` del repository, e si possono avviare a mano dalla scheda
+Actions.
 
 ## Controlli
 

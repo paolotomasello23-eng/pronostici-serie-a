@@ -2,12 +2,20 @@ name: Sincronizza calendario
 
 # Aggiorna partite e orari della giornata in corso e della successiva.
 #
-# Solo avvio a mano, dalla scheda Actions: per provarlo o per recuperare un
-# giro saltato. La programmazione automatica sta in Supabase (pg_cron,
-# migrazione 0016), perche' GitHub disattiva i workflow programmati dopo 60
-# giorni senza commit — e' successo il 21 ottobre 2026 — e sotto carico ne
-# salta la maggior parte.
+# I sync automatici girano in Supabase (pg_cron, migrazioni 0016 e 0017).
+# Questo workflow e' la rete di sicurezza: due giri al giorno, sfalsati
+# rispetto a quelli di Supabase, perche' anche se quelli si fermassero le
+# giornate continuino a comparire e si possano pronosticare. E' quello che
+# e' mancato fra ottobre e novembre 2026.
+#
+# GitHub disattiva i workflow programmati dopo 60 giorni senza commit, e
+# sotto carico ne salta una parte: per questo e' la riserva e non il
+# principale. Si puo' sempre avviare a mano dalla scheda Actions.
 on:
+  schedule:
+    # Minuto 23 e non 0: allo scoccare dell'ora GitHub e' piu' carico e
+    # salta piu' spesso. 07:23 e 19:23 UTC.
+    - cron: "23 7,19 * * *"
   workflow_dispatch:
 
 jobs:

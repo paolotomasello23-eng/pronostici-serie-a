@@ -2,12 +2,14 @@ name: Sincronizza risultati
 
 # Scarica i risultati delle giornate iniziate e ricalcola i punteggi.
 #
-# Solo avvio a mano, dalla scheda Actions: per provarlo o per recuperare un
-# giro saltato. La programmazione automatica sta in Supabase (pg_cron,
-# migrazione 0016), perche' GitHub disattiva i workflow programmati dopo 60
-# giorni senza commit — e' successo il 21 ottobre 2026 — e sotto carico ne
-# salta la maggior parte.
+# I sync automatici girano in Supabase (pg_cron, migrazioni 0016 e 0017).
+# Questo workflow e' la rete di sicurezza: un giro al giorno, in un orario
+# in cui Supabase non ne fa, cosi' la classifica si aggiorna comunque
+# anche se quelli si fermassero. Si puo' sempre avviare a mano dalla
+# scheda Actions.
 on:
+  schedule:
+    - cron: "47 8 * * *"
   workflow_dispatch:
 
 jobs:
